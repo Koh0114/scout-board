@@ -1,0 +1,61 @@
+name: Update data
+
+on:
+  schedule:
+    # 매일 06:00 KST (= 21:00 UTC 전날). GitHub 크론은 UTC 기준이고,
+    # 러너가 붐비면 수십 분 늦게 도는 게 정상이다.
+    - cron: "0 21 * * *"
+  workflow_dispatch:        # Actions 탭에서 수동 실행
+  push:
+    branches: [main]
+    paths:
+      - "site/template.html"
+      - "scripts/**"
+      - ".github/workflows/update-data.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-data
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Understat 내려받기
+        run: python scripts/fetch_understat.py
+
+      - name: data.json / index.html 생성
+        run: python scripts/build.py
+
+      - name: 결과 확인
+        run: |
+          python - <<'PY'
+          import json, sys
+          d = json.load(open("docs/data.json", encoding="utf-8"))
+          teams = sum(len(v) for v in d["teams"].values())
+          players = len(d["players"])
+          print(f"팀 {teams} · 선수 {players} · 기준 {d['meta']['season']}")
+          if teams < 30 or players < 200:
+              sys.exit("데이터가 비정상적으로 적습니다 — 커밋하지 않습니다.")
+          PY
+
+      - name: 커밋
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/data.json docs/index.html
+          if git diff --staged --quiet; then
+            echo "변경 없음"
+          else
+            git commit -m "data: $(date -u '+%Y-%m-%d')"
+            git push
+          fi
