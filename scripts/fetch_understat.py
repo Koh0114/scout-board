@@ -47,7 +47,8 @@ def get(url, tries=4):
 
 def main():
     cur = current_season()
-    seasons = [cur - 2, cur - 1, cur]
+    # 4시즌 — 백테스트(backtest.py)가 연속 시즌쌍 2개를 필요로 한다.
+    seasons = [cur - 3, cur - 2, cur - 1, cur]
     out = {}
     for lg in LEAGUES:
         for yr in seasons:

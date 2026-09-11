@@ -8,8 +8,10 @@ GitHub Actions가 매일 데이터를 다시 받아 커밋한다.
 
 ```
 scripts/fetch_understat.py   understat.com/getLeagueData/{league}/{season}
-                             → data/understat_raw.json   (gitignore, 3.7MB)
+                             최근 4시즌 → data/understat_raw.json   (gitignore, 3.7MB)
+scripts/model.py             지표·K추정·축소·역할점수 — build와 backtest가 공유한다
 scripts/build.py             raw → docs/data.json + docs/index.html
+scripts/backtest.py          raw → docs/backtest.json (모델 검증)
 site/template.html           사이트 본체 (HTML+CSS+JS 한 파일)
 docs/                        Pages가 서빙하는 폴더 — 전부 자동 생성물
 .github/workflows/           매일 06:00 KST 크론
@@ -33,6 +35,9 @@ docs/                        Pages가 서빙하는 폴더 — 전부 자동 생�
   - 역할 점수를 `pc`로 계산하면 0.49 npxG/90인 미드필더가 0.78인 홀란드를 이겨버린다.
 - **기준 시즌은 자동 전환.** 현재 시즌이 `SWITCH_AFTER`(15)경기 이상이면 그 시즌,
   아니면 직전 시즌. `FORM`은 항상 현재 시즌. 하드코딩하지 말 것.
+- **모델 로직은 `model.py`에만 둔다.** 백테스트는 '실제로 배포되는 모델'을 검증해야
+  의미가 있다. 점수 계산을 build.py에 복사해 두면 조용히 갈라진다.
+- **`pa`/`r`은 축소값(`_adj`) 기준, 표에 보이는 per-90은 원값.** 둘 다 data.json에 있다.
 - **`.github/workflows/`는 원격 도구로 못 쓴다.** Claude Code에서 이 경로를 수정할 때
   거부되면 사용자에게 직접 편집을 요청한다.
 

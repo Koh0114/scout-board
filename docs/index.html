@@ -324,6 +324,31 @@ footer p{margin:0 0 8px;max-width:78ch}
       값이 <em>작을수록</em> 강하게 압박했다는 뜻입니다.</p>
     </div>
   </section>
+
+  <section id="s-backtest" hidden>
+    <div class="sec-head"><h2>6. 모델 검증</h2>
+      <span class="hint" id="btHint">–</span></div>
+    <div class="note" id="btVerdict" style="margin-bottom:18px"></div>
+    <div class="grid2 cand">
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th>예측 방법</th>
+            <th class="n" style="text-align:right">피어슨 r</th>
+            <th class="n" style="text-align:right">스피어만 ρ</th>
+            <th class="n" style="text-align:right">R²</th>
+          </tr></thead>
+          <tbody id="btBody"></tbody>
+        </table>
+      </div>
+      <div class="panel">
+        <div class="panel-t" id="btScatterT">–</div>
+        <figure><div id="btScatter"></div>
+          <figcaption>가로축이 예측(역할 점수), 세로축이 다음 시즌 실제 생산입니다. 점이 추세선에 붙을수록 예측이 맞았다는 뜻입니다.</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
 </main>
 
 <footer class="wrap">
@@ -724,6 +749,95 @@ function render(){
   renderCandidates();
 }
 
+/* ---- 6. 모델 검증 (backtest.json — 없으면 섹션을 숨긴 채 넘어간다) ---- */
+let BT = null;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function renderBacktest(){
+  const done = BT && BT.pairs ? BT.pairs.filter(p=>!p.skipped) : [];
+  if(!done.length) return;
+  $('#s-backtest').hidden = false;
+
+  const v = BT.verdict || {};
+  $('#btHint').textContent = BT.meta.role_label + '으로 ' + BT.meta.target + '을 예측 · '
+    + done.map(p=>p.pair+' n='+p.n).join(' · ');
+  const mark = ok => ok ? '<b>예</b>' : '<b>아니오</b>';
+  $('#btVerdict').innerHTML =
+    '<b>이 모델이 실제로 예측력이 있나.</b> 아래는 N시즌 역할 점수로 N+1시즌 실제 생산을 맞혀 본 결과입니다.'
+    + '<ul style="margin:8px 0 0;padding-left:18px">'
+    + '<li>축소가 예측력을 올렸나 — ' + mark(v.shrink_beats_raw) + '</li>'
+    + '<li>단순 "지난 시즌 골 수"보다 나은가 — ' + mark(v.model_beats_goals) + '</li>'
+    + '<li>지난 시즌 (npxG+xA)/90을 그대로 쓴 것보다 나은가 — ' + mark(v.model_beats_prev_output)
+    + (v.model_beats_prev_output ? '' : ' · 역할 점수는 여러 지표를 묶은 종합 점수라 이 특정 대상 하나를 맞히는 데는 같은 지표를 그대로 쓰는 쪽이 낫습니다. 숨기지 않고 적어 둡니다.')
+    + '</li></ul>';
+
+  const body = $('#btBody'); body.innerHTML='';
+  const order = ['model_adj','model_raw','goals','prev_out'];
+  done.forEach(p=>{
+    const h = el('tr'); h.innerHTML = '<td colspan="4" style="font-weight:600">'+esc(p.pair)+' · 양 시즌 '+BT.meta.pool_min+'분 이상 <span class="num">'+p.n+'</span>명</td>';
+    body.appendChild(h);
+    const best = Math.max(...order.map(k=>p.methods[k].r));
+    order.forEach(k=>{
+      const m = p.methods[k], tr = el('tr');
+      const nm = esc(BT.meta.labels[k]) + (k==='model_adj' ? ' ←' : '');
+      tr.innerHTML = '<td'+(m.r===best?' style="font-weight:600"':'')+'>'+nm+'</td>'
+        + '<td class="n" style="text-align:right">'+f2(m.r)+'</td>'
+        + '<td class="n" style="text-align:right">'+f2(m.rho)+'</td>'
+        + '<td class="n" style="text-align:right">'+f2(m.r2)+'</td>';
+      body.appendChild(tr);
+    });
+  });
+
+  btScatter(done[done.length-1]);
+}
+
+function btScatter(p){
+  $('#btScatterT').textContent = p.pair + ' · 역할 점수 대 실제 생산';
+  const pts = p.scatter || [];
+  if(!pts.length) return;
+  const W=400,H=290,ml=44,mr=14,mt=14,mb=38;
+  const my = Math.max(0.1, ...pts.map(d=>d.y))*1.08;
+  const X = v=>ml+v/100*(W-ml-mr), Y = v=>H-mb-v/my*(H-mt-mb);
+  let g='';
+  for(let i=0;i<=4;i++){
+    const v=100*i/4; g+='<line x1="'+X(v)+'" y1="'+mt+'" x2="'+X(v)+'" y2="'+(H-mb)+'" stroke="var(--line)" stroke-width="1"/>';
+    g+='<text x="'+X(v)+'" y="'+(H-mb+15)+'" text-anchor="middle" font-size="10" fill="var(--ink-3)" font-family="IBM Plex Mono,monospace">'+v+'</text>';
+  }
+  for(let i=0;i<=3;i++){
+    const v=my*i/3; g+='<line x1="'+ml+'" y1="'+Y(v)+'" x2="'+(W-mr)+'" y2="'+Y(v)+'" stroke="var(--line)" stroke-width="1"/>';
+    g+='<text x="'+(ml-7)+'" y="'+(Y(v)+4)+'" text-anchor="end" font-size="10" fill="var(--ink-3)" font-family="IBM Plex Mono,monospace">'+f2(v)+'</text>';
+  }
+  g+='<text x="'+((ml+W-mr)/2)+'" y="'+(H-6)+'" text-anchor="middle" font-size="10.5" fill="var(--ink-3)">'+esc(p.from_season)+' 역할 점수</text>';
+  g+='<text x="12" y="'+((mt+H-mb)/2)+'" text-anchor="middle" font-size="10.5" fill="var(--ink-3)" transform="rotate(-90 12 '+((mt+H-mb)/2)+')">'+esc(p.to_season)+' (npxG+xA)/90</text>';
+
+  pts.forEach(d=>{ g+='<circle cx="'+X(d.x).toFixed(1)+'" cy="'+Y(d.y).toFixed(1)+'" r="3" fill="var(--s1)" opacity="0.45" data-n="'+encodeURIComponent(d.n)+'" data-t="'+encodeURIComponent(d.t)+'" data-x="'+f1(d.x)+'" data-y="'+f2(d.y)+'"/>'; });
+
+  const n=pts.length, sx=pts.reduce((a,d)=>a+d.x,0), sy=pts.reduce((a,d)=>a+d.y,0);
+  const sxy=pts.reduce((a,d)=>a+d.x*d.y,0), sxx=pts.reduce((a,d)=>a+d.x*d.x,0);
+  const den=n*sxx-sx*sx;
+  if(den!==0){
+    const b=(n*sxy-sx*sy)/den, a=(sy-b*sx)/n;
+    const x0=0,x1=100;
+    g+='<line x1="'+X(x0)+'" y1="'+Y(Math.max(0,a+b*x0))+'" x2="'+X(x1)+'" y2="'+Y(Math.min(my,a+b*x1))+'" stroke="var(--s2)" stroke-width="2"/>';
+  }
+  const boxes=[];
+  const fits=(x0,y0,w,h)=> x0>ml-2 && x0+w<W-mr+2 && y0>mt && y0+h<H-mb &&
+      !boxes.some(b=> x0<b.x+b.w+3 && x0+w+3>b.x && y0<b.y+b.h+2 && y0+h+2>b.y);
+  pts.slice().sort((a,b)=>b.y-a.y).slice(0,5).forEach(d=>{
+    const nm=d.n.split(' ').slice(-1)[0];
+    const w=nm.length*5.6+2, h=11, cx=X(d.x), cy=Y(d.y);
+    const opts=[[cx+8,cy-5.5],[cx-8-w,cy-5.5],[cx-w/2,cy-14],[cx-w/2,cy+8]];
+    for(const [ox,oy] of opts){
+      if(fits(ox,oy,w,h)){
+        boxes.push({x:ox,y:oy,w:w,h:h});
+        g+='<text x="'+(ox+1)+'" y="'+(oy+9)+'" font-size="9.5" fill="var(--ink-2)">'+esc(nm)+'</text>';
+        break;
+      }
+    }
+  });
+  $('#btScatter').innerHTML='<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="역할 점수 대 다음 시즌 실제 생산 산점도">'+g+'</svg>';
+}
+
 async function boot(){
   const inline = document.getElementById('payload');
   const txt = inline ? inline.textContent.trim() : '';
@@ -742,7 +856,12 @@ async function boot(){
   initMeta();
   fillTeams();
   render();
-  addEventListener('resize',()=>{renderTrend();renderCandidates();});
+  // 검증 결과는 선택적이다 — 인라인 payload 배포에는 backtest.json이 없다.
+  try{
+    const b = await fetch('backtest.json?t=' + Date.now(), {cache:'no-store'});
+    if(b.ok){ BT = await b.json(); renderBacktest(); }
+  }catch(e){ /* 섹션을 숨긴 채 넘어간다 */ }
+  addEventListener('resize',()=>{renderTrend();renderCandidates(); if(BT) renderBacktest();});
 }
 boot();
 })();
