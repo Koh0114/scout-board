@@ -305,6 +305,9 @@ footer p{margin:0 0 8px;max-width:78ch}
       역할 점수는 후보 풀 725명 전체를 하나의 기준으로 매긴 지표별 백분위를 가중 평균한 0–100 값입니다 (포지션이 다른 선수끼리 비교되도록) —
       결정력 = npxG/90 0.55 + 슈팅/90 0.25 + xGChain/90 0.20, 찬스 메이킹 = xA/90 0.50 + 키패스/90 0.30 + xGChain/90 0.20,
       빌드업 = xGBuildup/90 0.60 + xGChain/90 0.40. 선수 행을 펼치면 나오는 막대는 이와 달리 <em>같은 포지션 그룹 안에서의</em> 백분위로, 스카우팅 리포트에서 쓰는 방식입니다.</p>
+      <p style="margin:0 0 10px"><b>표본 크기 보정.</b> 표에 보이는 per-90 값은 원값이지만, <em>백분위와 역할 점수는 출전 시간으로 축소(shrinkage)한 값</em>으로 계산합니다 —
+      <span class="num">조정값 = (원값 × 출전분 + 포지션 그룹 평균 × K) / (출전분 + K)</span>. 600분만 뛴 선수의 per-90은 상당 부분이 운이라 2900분 뛴 선수와 같은 무게로 둘 수 없기 때문입니다.
+      <span id="shrinkline"></span></p>
       <p style="margin:0"><b>한계.</b> Understat은 슈팅 기반 데이터라 태클·인터셉트·패스 성공률·볼터치 같은 수비/소유 지표가 없습니다.
       그래서 팀 <em>진단</em>은 수비까지 다루지만 선수 <em>추천</em>은 공격·창조 역할에 한정됩니다. 나이와 이적료도 포함돼 있지 않아
       영입 현실성(계약 기간, 시장가)은 판단하지 않습니다. PPDA는 상대 수비 3선에서의 패스 허용량 대비 수비 액션 수로,
@@ -364,6 +367,14 @@ function initMeta(){
   $('#m-pool').textContent = D.players.length + '명';
   $('#m-upd').textContent = D.meta.generated;
   $('#genline').textContent = '집계 기준일 ' + D.meta.generated + ' · 후보 풀은 ' + D.meta.season + ' 시즌 ' + D.meta.pool_min + '분 이상 출전한 필드 플레이어입니다. 데이터는 매일 자동으로 다시 내려받습니다.';
+  const sk = D.meta.shrink && D.meta.shrink.k;
+  if(sk){
+    const est = Object.keys(sk).filter(m=>sk[m].source==='estimated');
+    const parts = Object.keys(sk).map(m=>m.replace('90','')+' '+sk[m].K);
+    $('#shrinkline').innerHTML = 'K는 ' + (est.length
+      ? '연속 두 시즌 모두 ' + D.meta.pool_min + '분 이상 뛴 선수 ' + sk[est[0]].n + '명의 시즌간 상관계수에서 추정했습니다 (K ≈ 평균 출전분 × (1−r)/r)'
+      : '표본이 모자라 기본값을 썼습니다') + ' — <span class="num">' + parts.join(', ') + '</span>분.';
+  }
 }
 
 /* ---- controls ---- */
