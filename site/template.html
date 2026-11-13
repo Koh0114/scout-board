@@ -180,10 +180,10 @@ footer p{margin:0 0 8px;max-width:78ch}
   <div class="wrap mast-in">
     <div>
       <h1><span>Recruitment Analytics</span>Scout Board</h1>
-      <p>프리미어리그·라리가 40개 팀을 xG 기반 지표로 진단하고, 그 팀에 부족한 역할을 채울 선수를 두 리그 전체에서 찾습니다.</p>
+      <p>프리미어리그·라리가 40개 팀을 xG·압박·수비 지표로 진단하고, 그 팀에 부족한 역할을 채울 선수를 두 리그 전체에서 찾습니다.</p>
     </div>
     <div class="srcline">
-      <span>데이터 <b>Understat</b></span>
+      <span>데이터 <b>FotMob</b></span>
       <span>기준 시즌 <b id="m-season">–</b></span>
       <span>최근 폼 <b id="m-form">–</b></span>
       <span>후보 풀 <b id="m-pool">–</b></span>
@@ -204,10 +204,12 @@ footer p{margin:0 0 8px;max-width:78ch}
     </label>
     <label class="fld"><input type="checkbox" id="crossOnly"> 상대 리그 선수만</label>
     <select id="posSel" aria-label="포지션 필터" style="min-width:120px">
-      <option value="ALL">포지션 전체</option>
-      <option value="FW">공격수</option>
-      <option value="MF">미드필더</option>
-      <option value="DF">수비수</option>
+      <option value="ALL">역할 대상 포지션</option>
+      <option value="CB">센터백</option>
+      <option value="FB">풀백·윙백</option>
+      <option value="CM">중앙 미드필더</option>
+      <option value="AM">공격형·측면</option>
+      <option value="ST">스트라이커</option>
     </select>
   </div>
 </div>
@@ -236,21 +238,9 @@ footer p{margin:0 0 8px;max-width:78ch}
       </div>
     </div>
 
-    <div class="grid2 even" style="margin-top:22px">
-      <div class="panel">
-        <div class="panel-t">포지션별 생산량 (팀 내 출전시간 기준 90분당)</div>
-        <div class="ladder" id="posladder"></div>
-      </div>
-      <div class="panel">
-        <div class="panel-t">시즌 흐름 · 경기당 npxG / 피npxG (5경기 이동평균)</div>
-        <div class="legend">
-          <span><i style="background:var(--s1)"></i>만든 기회 npxG</span>
-          <span><i style="background:var(--s2)"></i>내준 기회 피npxG</span>
-        </div>
-        <figure><div id="trend"></div>
-          <figcaption>세로축은 경기당 논페널티 기대득점. 두 선의 간격이 벌어질수록 경기 내용에서 앞섰다는 뜻입니다.</figcaption>
-        </figure>
-      </div>
+    <div class="panel" style="margin-top:22px">
+      <div class="panel-t">포지션별 생산량 (팀 내 출전시간 기준 90분당, 리그 20개 팀 안 백분위)</div>
+      <div class="ladder" id="posladder"></div>
     </div>
   </section>
 
@@ -277,41 +267,61 @@ footer p{margin:0 0 8px;max-width:78ch}
             <th style="width:34px"></th><th>선수</th><th>포지션</th>
             <th class="n" style="text-align:right">출전</th>
             <th class="n" style="text-align:right">G+A</th>
-            <th class="n" style="text-align:right">npxG/90</th>
-            <th class="n" style="text-align:right">xA/90</th>
+            <th class="n" style="text-align:right" id="colA">–</th>
+            <th class="n" style="text-align:right" id="colB">–</th>
             <th style="text-align:right;min-width:120px">역할 점수</th>
           </tr></thead>
           <tbody id="candBody"></tbody>
         </table>
       </div>
       <div class="panel">
-        <div class="panel-t">후보 지형 · npxG/90 대 xA/90</div>
+        <div class="panel-t" id="scatterT">–</div>
         <div class="legend">
           <span><i style="background:var(--s2)"></i>추천 후보 상위 10</span>
           <span><i style="background:var(--s1)"></i>현 스쿼드</span>
           <span><i style="background:var(--ink-3)"></i>나머지 풀</span>
         </div>
         <figure><div id="scatter"></div>
-          <figcaption>오른쪽 위로 갈수록 직접 득점과 기회 창출을 함께 해내는 선수입니다.</figcaption>
+          <figcaption>가로·세로축은 이 역할의 대표 지표 두 개(90분당 원값)입니다. 오른쪽 위로 갈수록 둘 다 높습니다.</figcaption>
         </figure>
       </div>
     </div>
+    <div id="mergeNote" style="margin-top:14px"></div>
+    <details class="note" id="excl" style="margin-top:14px">
+      <summary style="cursor:pointer"><b>출전 경기 부족으로 순위 제외</b> <span class="num" id="exclN">–</span></summary>
+      <p style="margin:8px 0 10px">출전 시간은 기준을 넘었지만 출전 경기가 팀 경기의 절반에 못 미친 선수입니다. FotMob은 이 선수들의 슈팅·패스·태클 같은
+      90분당 지표를 제공하지 않아 역할 점수를 매길 수 없습니다. 0으로 채우지 않고 순위에서 뺐습니다. 지금 고른 역할의 대상 포지션만 보여줍니다.</p>
+      <div class="tbl-wrap"><table style="min-width:520px">
+        <thead><tr><th>선수</th><th>포지션</th><th class="n" style="text-align:right">출전</th><th class="n" style="text-align:right">출전 경기 / 팀 경기</th></tr></thead>
+        <tbody id="exclBody"></tbody>
+      </table></div>
+    </details>
   </section>
 
   <section id="s-method">
     <div class="sec-head"><h2>5. 방법과 한계</h2></div>
     <div class="note">
-      <p style="margin:0 0 10px"><b>계산 방식.</b> 팀 지표는 시즌 전 경기의 합을 경기수로 나눈 값이고, 선수 지표는 출전 90분당 값입니다.
-      역할 점수는 후보 풀 725명 전체를 하나의 기준으로 매긴 지표별 백분위를 가중 평균한 0–100 값입니다 (포지션이 다른 선수끼리 비교되도록) —
-      결정력 = npxG/90 0.55 + 슈팅/90 0.25 + xGChain/90 0.20, 찬스 메이킹 = xA/90 0.50 + 키패스/90 0.30 + xGChain/90 0.20,
-      빌드업 = xGBuildup/90 0.60 + xGChain/90 0.40. 선수 행을 펼치면 나오는 막대는 이와 달리 <em>같은 포지션 그룹 안에서의</em> 백분위로, 스카우팅 리포트에서 쓰는 방식입니다.</p>
+      <p style="margin:0 0 10px"><b>계산 방식.</b> 팀 지표는 시즌 합계를 경기 수로 나눈 값이고, 선수 지표는 출전 90분당 값입니다.
+      FotMob이 합계를 주는 지표(태클·인터셉트·클리어·리커버리·블록)는 반올림된 90분당 값을 쓰지 않고 합계에서 직접 계산합니다.
+      후보 풀은 <span id="poolrule">–</span>인 필드 플레이어 <span class="num" id="pooln">–</span>명이고, 포지션은
+      센터백·풀백(윙백 포함)·중앙 미드필더·공격형/측면·스트라이커 다섯 그룹으로 나눕니다.</p>
+      <p style="margin:0 0 10px"><b>역할 점수.</b> 출전 시간으로 축소한 지표를 후보 풀 전체 기준 z-점수로 바꿔 가중합한 뒤, 그 합의 풀 안 백분위 순위(0–100)를 보여줍니다.
+      포지션이 다른 선수끼리 같은 잣대로 비교됩니다. 역할별 지표와 가중치 — <span id="rolew">–</span>.
+      선수 행을 펼치면 나오는 막대는 이와 달리 <em>같은 포지션 그룹 안에서의</em> 백분위입니다.</p>
+      <p style="margin:0 0 10px"><b>모델을 바꾼 이유.</b> 처음에는 지표별 백분위를 가중 평균했고, 결정력은 npxG/90 0.55 + 슈팅/90 0.25 + 드리블/90 0.20이었습니다.
+      FotMob 데이터로 처음 돌린 백테스트(커밋 921daf3)에서 이 모델은 다섯 역할 모두, 두 시즌 쌍 모두에서 "지난 시즌 원지표를 그대로 쓴 것"보다 예측력이 낮았습니다
+      (결정력 r 0.61–0.62 대 지난 시즌 npxG/90 0.70–0.76). 백분위로 바꾸는 과정과 여러 지표를 섞는 과정이 정보를 깎은 것입니다.
+      그래서 백분위 대신 z-점수 가중합을 쓰고, 결정력은 축소한 npxG/90 하나로 줄였습니다. 가중치는 백테스트 결과를 보고 고르지 않았습니다 —
+      시즌 쌍 두 개로 고르고 같은 두 개로 검증하면 과적합이기 때문입니다.</p>
       <p style="margin:0 0 10px"><b>표본 크기 보정.</b> 표에 보이는 per-90 값은 원값이지만, <em>백분위와 역할 점수는 출전 시간으로 축소(shrinkage)한 값</em>으로 계산합니다 —
       <span class="num">조정값 = (원값 × 출전분 + 포지션 그룹 평균 × K) / (출전분 + K)</span>. 600분만 뛴 선수의 per-90은 상당 부분이 운이라 2900분 뛴 선수와 같은 무게로 둘 수 없기 때문입니다.
       <span id="shrinkline"></span></p>
-      <p style="margin:0"><b>한계.</b> Understat은 슈팅 기반 데이터라 태클·인터셉트·패스 성공률·볼터치 같은 수비/소유 지표가 없습니다.
-      그래서 팀 <em>진단</em>은 수비까지 다루지만 선수 <em>추천</em>은 공격·창조 역할에 한정됩니다. 나이와 이적료도 포함돼 있지 않아
-      영입 현실성(계약 기간, 시장가)은 판단하지 않습니다. PPDA는 상대 수비 3선에서의 패스 허용량 대비 수비 액션 수로,
-      값이 <em>작을수록</em> 강하게 압박했다는 뜻입니다.</p>
+      <p style="margin:0 0 10px"><b>점유율 보정.</b> 팀 진단의 수비 활동량(태클+인터셉트)은 상대 점유율 50%로 환산해 비교합니다
+      (<span class="num">× 50 / (100 − 팀 점유율)</span>). 선수 지표에는 같은 보정을 넣지 않았습니다 — 백테스트에서 다음 시즌 예측이 오히려 나빠졌습니다.</p>
+      <p style="margin:0"><b>한계.</b> npxG는 FotMob에 없어 <span class="num">xG − 0.79 × PK 골</span>로 근사했습니다(실축한 PK는 빼지 못합니다).
+      FotMob의 xG 모델은 Understat과 달라 예전 수치와 직접 비교하면 안 됩니다. 볼터치·나이·이적료는 없어 영입 현실성(계약 기간, 시장가)은 판단하지 않습니다.
+      라인 브레이킹 패스는 일부 시즌(EPL 2023/24·2024/25, 라리가 2023/24)에 데이터가 없어 역할 점수에 넣지 않고 선수 상세에만 표시합니다.
+      경기별 xG 추이는 경기마다 따로 받아야 해서 보여주지 않습니다. FotMob 비공식 경로라 구조가 바뀌면 갱신이 멈출 수 있습니다.</p>
     </div>
   </section>
 
@@ -322,19 +332,14 @@ footer p{margin:0 0 8px;max-width:78ch}
     <div class="grid2 cand">
       <div class="tbl-wrap">
         <table>
-          <thead><tr>
-            <th>예측 방법</th>
-            <th class="n" style="text-align:right">피어슨 r</th>
-            <th class="n" style="text-align:right">스피어만 ρ</th>
-            <th class="n" style="text-align:right">R²</th>
-          </tr></thead>
+          <thead><tr id="btHead"></tr></thead>
           <tbody id="btBody"></tbody>
         </table>
       </div>
       <div class="panel">
         <div class="panel-t" id="btScatterT">–</div>
         <figure><div id="btScatter"></div>
-          <figcaption>가로축이 예측(역할 점수), 세로축이 다음 시즌 실제 생산입니다. 점이 추세선에 붙을수록 예측이 맞았다는 뜻입니다.</figcaption>
+          <figcaption>지금 고른 역할입니다. 가로축이 N시즌 역할 점수(z 합성값), 세로축이 N+1시즌 예측 대상입니다. 점이 추세선에 붙을수록 예측이 맞았다는 뜻입니다.</figcaption>
         </figure>
       </div>
     </div>
@@ -342,7 +347,9 @@ footer p{margin:0 0 8px;max-width:78ch}
 </main>
 
 <footer class="wrap">
-  <p>데이터 출처: <a href="https://understat.com" target="_blank" rel="noopener">Understat</a> — 2023/24–2026/27 프리미어리그·라리가 전 경기 shot-level xG 집계.</p>
+  <p>데이터 출처: <a href="https://www.fotmob.com" target="_blank" rel="noopener">FotMob</a> — 2023/24–2026/27 프리미어리그·라리가 선수·팀 시즌 지표와 순위표.
+  2026년 10월까지는 Understat을 썼고, 11월 1일부터 Understat이 점검 페이지만 반환하는 장애가 이어져 FotMob으로 교체했습니다.
+  두 소스의 xG 모델이 달라 이전 수치와 직접 비교할 수 없습니다.</p>
   <p id="genline"></p>
 </footer>
 
@@ -360,27 +367,37 @@ const f2 = n => (Math.round(n*100)/100).toFixed(2);
 
 const LGNAME = {EPL:'프리미어리그', La_liga:'라리가'};
 const LGSHORT = {EPL:'PL', La_liga:'라리가'};
-const POSNAME = {FW:'공격수', MF:'미드필더', DF:'수비수'};
+const POSNAME = {CB:'센터백', FB:'풀백·윙백', CM:'중앙 미드필더', AM:'공격형·측면', ST:'스트라이커'};
+const POS5 = ['CB','FB','CM','AM','ST'];
+const peerName = g => g.split('+').map(x=>POSNAME[x]).join('+');
 
-/* ---- team metric dictionary ---- */
+/* ---- team metric dictionary (FotMob) ---- */
 const TM = [
-  {k:'npxG90',       label:'기회 창출 (npxG)',   unit:'/경기', val:t=>f2(t.npxG90),
-   good:'경기당 만들어내는 기대득점', bad:'기회 자체를 못 만든다'},
-  {k:'npxGA90',      label:'기회 억제 (피npxG)', unit:'/경기', val:t=>f2(t.npxGA90),
+  {k:'xG90',       label:'기회 창출 (xG)',      unit:'/경기', val:t=>f2(t.xG90),
+   good:'경기당 만들어내는 기대득점이 많다', bad:'기회 자체를 못 만든다'},
+  {k:'xGA90',      label:'기회 억제 (피xG)',    unit:'/경기', val:t=>f2(t.xGA90),
    good:'상대에게 좋은 슛을 거의 안 준다', bad:'상대에게 좋은 슛을 너무 많이 내준다'},
-  {k:'finishing',    label:'결정력 (득점−xG)',   unit:'골',    val:t=>(t.finishing>=0?'+':'')+f1(t.finishing),
+  {k:'finishing',  label:'결정력 (득점−xG)',    unit:'골',    val:t=>(t.finishing>=0?'+':'')+f1(t.finishing),
    good:'기대치보다 더 넣는다', bad:'만든 기회를 골로 못 바꾼다'},
-  {k:'keeping',      label:'실점 억제 (xGA−실점)',unit:'골',   val:t=>(t.keeping>=0?'+':'')+f1(t.keeping),
+  {k:'keeping',    label:'실점 억제 (피xG−실점)',unit:'골',   val:t=>(t.keeping>=0?'+':'')+f1(t.keeping),
    good:'골키퍼·수비가 기대치보다 잘 막는다', bad:'막아야 할 슛을 실점으로 내준다'},
-  {k:'deep90',       label:'최종지역 침투',       unit:'/경기', val:t=>f1(t.deep90),
-   good:'상대 골문 앞까지 자주 들어간다', bad:'상대 진영 깊숙이 못 들어간다'},
-  {k:'deep_allowed90',label:'최종지역 피침투',    unit:'/경기', val:t=>f1(t.deep_allowed90),
-   good:'우리 골문 앞을 잘 안 내준다', bad:'우리 진영 깊숙이 자주 뚫린다'},
-  {k:'ppda',         label:'전방 압박 (PPDA)',   unit:'',      val:t=>f1(t.ppda),
-   good:'상대 빌드업을 강하게 압박한다', bad:'압박이 느슨해 상대가 편하게 빌드업한다'},
-  {k:'ppda_allowed', label:'압박 회피',          unit:'',      val:t=>f1(t.ppda_allowed),
-   good:'상대 압박 속에서도 공을 잘 돌린다', bad:'상대 압박에 막혀 빌드업이 끊긴다'}
+  {k:'box90',      label:'박스 침투',            unit:'터치/경기', val:t=>f1(t.box90),
+   good:'상대 페널티 박스 안에서 공을 자주 잡는다', bad:'상대 박스 안까지 못 들어간다'},
+  {k:'press90',    label:'전방 압박',            unit:'탈취/경기', val:t=>f1(t.press90),
+   good:'상대 진영 파이널 서드에서 공을 자주 뺏는다', bad:'높은 지역에서 공을 거의 못 뺏는다'},
+  {k:'poss',       label:'점유',                 unit:'%',     val:t=>f1(t.poss),
+   good:'공을 오래 가진다', bad:'공을 오래 못 가진다'},
+  {k:'defact_adj', label:'수비 활동량 (점유 보정)', unit:'/경기', val:t=>f1(t.defact_adj),
+   good:'점유율을 감안해도 태클·인터셉트가 많다', bad:'점유율을 감안하면 태클·인터셉트가 적다'}
 ];
+
+/* ---- role → 표·산점도에 보여줄 대표 지표 두 개 ---- */
+const MLAB = {npxG90:'npxG/90', xA90:'xA/90', sh90:'슈팅/90', drib90:'드리블/90', chances90:'기회 창출/90', bigch90:'빅찬스/90',
+  pass90:'성공 패스/90', long90:'성공 롱볼/90', tkl90:'태클/90', int90:'인터셉트/90', rec90:'리커버리/90', clr90:'클리어/90', blk90:'블록/90'};
+const ROLECOLS = {finisher:['npxG90','sh90'], creator:['xA90','chances90'], progressor:['pass90','long90'],
+  ballwinner:['tkl90','int90'], boxdef:['clr90','blk90']};
+const PM = [['npxG90','득점 기대값'],['sh90','슈팅'],['drib90','드리블'],['xA90','기회 제공'],['chances90','기회 창출'],['bigch90','빅찬스 창출'],
+  ['pass90','성공 패스'],['long90','성공 롱볼'],['tkl90','태클'],['int90','인터셉트'],['rec90','리커버리'],['clr90','클리어'],['blk90','블록']];
 
 /* ---- state ---- */
 const S = {lg:'EPL', team:null, role:null, mins:600, cross:false, pos:'ALL'};
@@ -391,13 +408,25 @@ function initMeta(){
   $('#m-form').textContent = D.meta.form_season;
   $('#m-pool').textContent = D.players.length + '명';
   $('#m-upd').textContent = D.meta.generated;
-  $('#genline').textContent = '집계 기준일 ' + D.meta.generated + ' · 후보 풀은 ' + D.meta.season + ' 시즌 ' + D.meta.pool_min + '분 이상 출전한 필드 플레이어입니다. 데이터는 매일 자동으로 다시 내려받습니다.';
+  $('#genline').textContent = '집계 기준일 ' + D.meta.generated + ' · 후보 풀은 ' + D.meta.season + ' 시즌 ' + D.meta.pool_rule + '인 필드 플레이어입니다. 데이터는 매일 자동으로 다시 내려받습니다.';
+  $('#poolrule').textContent = D.meta.pool_rule;
+  $('#pooln').textContent = D.players.length;
+  const rw = D.role_weights || {};
+  $('#rolew').innerHTML = Object.keys(D.roles).map(k=>'<b>'+esc(D.roles[k].split(' (')[0])+'</b> = '
+    + Object.keys(rw[k]).map(m=>esc(MLAB[m]||m)+(Object.keys(rw[k]).length>1?' '+rw[k][m]:'')).join(' + ')
+    + ' <span style="color:var(--ink-3)">(' + D.role_groups[k].map(g=>POSNAME[g]).join('·') + ')</span>').join(', ');
+  const mg = D.meta.groups_merged || [];
+  if(mg.length){
+    $('#mergeNote').innerHTML = '<div class="note" style="border-color:var(--warn)"><b>포지션 그룹을 자동으로 합쳤습니다.</b> '
+      + mg.map(x=>POSNAME[x.group]||x.group).join(', ') + ' 그룹이 ' + D.meta.min_group + '명 미만이라 백분위가 거칠어지므로 이웃 그룹과 합쳐 계산했습니다 — '
+      + mg.map(x=>esc(x.group)+' '+x.n+'명 + '+esc(x.into)+' '+x.n_into+'명 → '+esc(x.result)+' '+x.n_result+'명').join(' · ') + '.</div>';
+  }
   const sk = D.meta.shrink && D.meta.shrink.k;
   if(sk){
     const est = Object.keys(sk).filter(m=>sk[m].source==='estimated');
     const parts = Object.keys(sk).map(m=>m.replace('90','')+' '+sk[m].K);
     $('#shrinkline').innerHTML = 'K는 ' + (est.length
-      ? '연속 두 시즌 모두 ' + D.meta.pool_min + '분 이상 뛴 선수 ' + sk[est[0]].n + '명의 시즌간 상관계수에서 추정했습니다 (K ≈ 평균 출전분 × (1−r)/r)'
+      ? '완주한 연속 두 시즌 모두 후보 풀에 든 선수 ' + sk[est[0]].n + '명의 시즌간 상관계수에서 추정했습니다 (K ≈ 평균 출전분 × (1−r)/r)'
       : '표본이 모자라 기본값을 썼습니다') + ' — <span class="num">' + parts.join(', ') + '</span>분.';
   }
 }
@@ -444,9 +473,9 @@ function renderTeam(){
   $('#t-name').textContent = t.name;
 
   const kpis = [
-    ['승점', t.pts, '기대승점 ' + f1(t.xpts)],
+    ['승점', t.pts, t.w + '승 ' + t.d + '무 ' + t.l + '패'],
     ['득실', t.gf + '−' + t.ga, '경기당 ' + f2(t.gf90) + '−' + f2(t.ga90)],
-    ['npxG 차이', (t.npxGD90>=0?'+':'')+f2(t.npxGD90), '경기당'],
+    ['xG 차이', (t.xGD90>=0?'+':'')+f2(t.xGD90), '경기당'],
     ['결정력', (t.finishing>=0?'+':'')+f1(t.finishing), '득점−xG']
   ];
   $('#t-kpis').innerHTML = kpis.map(([a,b,c])=>
@@ -457,7 +486,7 @@ function renderTeam(){
 
   const n = t.form_now;
   $('#t-now').innerHTML = n
-    ? '<div class="note" style="padding:10px 13px;font-size:12.5px"><b>'+D.meta.form_season+' 현재</b> '+n.mp+'경기 '+n.pts+'점 · 경기당 npxG 차이 <span class="num">'+(n.npxGD90>=0?'+':'')+f2(n.npxGD90)+'</span></div>'
+    ? '<div class="note" style="padding:10px 13px;font-size:12.5px"><b>'+D.meta.form_season+' 현재</b> '+n.mp+'경기 '+n.pts+'점 · 경기당 xG 차이 <span class="num">'+(n.xGD90>=0?'+':'')+f2(n.xGD90)+'</span></div>'
     : '';
 
   const lad = $('#ladder'); lad.innerHTML='';
@@ -480,7 +509,7 @@ function renderTeam(){
   });
 
   const pl = $('#posladder'); pl.innerHTML='';
-  ['FW','MF','DF'].forEach(pos=>{
+  POS5.forEach(pos=>{
     [['npxG90','득점 생산'],['xA90','기회 제공']].forEach(([mk,lab])=>{
       const bp = t.by_pos[pos]; const p = bp.pct[mk];
       const row = el('div','lrow');
@@ -498,60 +527,15 @@ function renderTeam(){
   });
 }
 
-/* ---- trend chart ---- */
-function renderTrend(){
-  const t = team();
-  const roll = arr => arr.map((_,i)=>{
-    const a = arr.slice(Math.max(0,i-4), i+1);
-    return a.reduce((s,x)=>s+x,0)/a.length;
-  });
-  const A = roll(t.xg_series), B = roll(t.xga_series);
-  const W=440,H=190,ml=34,mr=54,mt=14,mb=26;
-  const max = Math.max(...A,...B,1.2)*1.12;
-  const x = i => ml + i*(W-ml-mr)/(A.length-1);
-  const y = v => mt + (1-v/max)*(H-mt-mb);
-  const path = arr => arr.map((v,i)=>(i?'L':'M')+x(i).toFixed(1)+' '+y(v).toFixed(1)).join(' ');
-  let g='';
-  const ticks=[0,max/2,max];
-  ticks.forEach(v=>{
-    g += '<line x1="'+ml+'" y1="'+y(v)+'" x2="'+(W-mr)+'" y2="'+y(v)+'" stroke="var(--line)" stroke-width="1"/>'
-      +  '<text x="'+(ml-7)+'" y="'+(y(v)+4)+'" text-anchor="end" font-size="10" fill="var(--ink-3)" font-family="IBM Plex Mono,monospace">'+f1(v)+'</text>';
-  });
-  g += '<path d="'+path(A)+'" fill="none" stroke="var(--s1)" stroke-width="2" stroke-linejoin="round"/>';
-  g += '<path d="'+path(B)+'" fill="none" stroke="var(--s2)" stroke-width="2" stroke-linejoin="round"/>';
-  const last = A.length-1;
-  g += '<circle cx="'+x(last)+'" cy="'+y(A[last])+'" r="4" fill="var(--s1)" stroke="var(--surface)" stroke-width="2"/>';
-  g += '<circle cx="'+x(last)+'" cy="'+y(B[last])+'" r="4" fill="var(--s2)" stroke="var(--surface)" stroke-width="2"/>';
-  let ya = y(A[last])+4, yb = y(B[last])+4;
-  if(Math.abs(ya-yb) < 13){ const mid=(ya+yb)/2; if(A[last]>=B[last]){ya=mid-7;yb=mid+7;} else {ya=mid+7;yb=mid-7;} }
-  g += '<text x="'+(x(last)+9)+'" y="'+ya+'" font-size="11" fill="var(--s1)" font-family="IBM Plex Mono,monospace" font-weight="600">'+f2(A[last])+'</text>';
-  g += '<text x="'+(x(last)+9)+'" y="'+yb+'" font-size="11" fill="var(--s2)" font-family="IBM Plex Mono,monospace" font-weight="600">'+f2(B[last])+'</text>';
-  [1, Math.round(A.length/2), A.length].forEach(k=>{
-    g += '<text x="'+x(k-1)+'" y="'+(H-8)+'" text-anchor="middle" font-size="10" fill="var(--ink-3)" font-family="IBM Plex Mono,monospace">'+k+'R</text>';
-  });
-  const hit = A.map((_,i)=>'<rect x="'+(x(i)-4)+'" y="'+mt+'" width="8" height="'+(H-mt-mb)+'" fill="transparent" data-i="'+i+'"/>').join('');
-  const svg = '<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="시즌 경기별 기대득점 추이">'+g+hit+'</svg>';
-  const box = $('#trend'); box.innerHTML = svg;
-  box.querySelectorAll('rect[data-i]').forEach(r=>{
-    r.addEventListener('mousemove',e=>{
-      const i=+r.dataset.i;
-      showTip('<b>'+(i+1)+'라운드까지 5경기 평균</b><br>만든 기회 <span class="num">'+f2(A[i])+'</span><br>내준 기회 <span class="num">'+f2(B[i])+'</span>',e.clientX,e.clientY);
-    });
-    r.addEventListener('mouseleave',hideTip);
-  });
-}
-
 /* ---- 2. findings ---- */
 function findings(){
   const t = team();
   const items = TM.map(m=>({m, p:t.pct[m.k]}));
   const posItems = [];
-  ['FW','MF','DF'].forEach(pos=>{
-    posItems.push({key:pos+'_npxG90', label:POSNAME[pos]+' 득점 생산', p:t.by_pos[pos].pct.npxG90,
-      bad:POSNAME[pos]+' 라인이 직접 만들어내는 슛 기대값이 리그 최하위권'});
-    posItems.push({key:pos+'_xA90', label:POSNAME[pos]+' 기회 제공', p:t.by_pos[pos].pct.xA90,
-      bad:POSNAME[pos]+' 라인에서 나오는 결정적 패스가 리그 최하위권'});
-  });
+  ['ST','AM','CM'].forEach(pos=>posItems.push({label:POSNAME[pos]+' 득점 생산', p:t.by_pos[pos].pct.npxG90,
+    bad:POSNAME[pos]+' 라인이 직접 만들어내는 슛 기대값이 리그 최하위권'}));
+  ['AM','CM','FB'].forEach(pos=>posItems.push({label:POSNAME[pos]+' 기회 제공', p:t.by_pos[pos].pct.xA90,
+    bad:POSNAME[pos]+' 라인에서 나오는 결정적 패스가 리그 최하위권'}));
   const weak = items.slice().sort((a,b)=>a.p-b.p).filter(x=>x.p<50).slice(0,3);
   const strong = items.slice().sort((a,b)=>b.p-a.p).slice(0,2);
   const weakPos = posItems.slice().sort((a,b)=>a.p-b.p)[0];
@@ -559,7 +543,7 @@ function findings(){
   const rank = p => Math.max(1, Math.round(20 - p/100*20 + 0.5));
   const box = $('#findings'); box.innerHTML='';
   if(!weak.length){
-    box.appendChild(el('div','find good','<h4>뚜렷한 약점 없음</h4><p>8개 팀 지표가 모두 리그 중간값 이상입니다. 아래 보강안은 개선 여지가 가장 큰 쪽을 참고용으로 제시합니다.</p>'));
+    box.appendChild(el('div','find good','<h4>뚜렷한 약점 없음</h4><p>'+TM.length+'개 팀 지표가 모두 리그 중간값 이상입니다. 아래 보강안은 개선 여지가 가장 큰 쪽을 참고용으로 제시합니다.</p>'));
   }
   weak.forEach(w=>{
     box.appendChild(el('div','find',
@@ -577,32 +561,36 @@ function findings(){
 }
 
 /* ---- 3. needs ---- */
+const ROLE_ORDER = ['finisher','creator','progressor','ballwinner','boxdef'];
 function needs(diag){
   const t = diag.t || team();
-  const score = {finisher:0, creator:0, progressor:0};
-  const why = {finisher:[], creator:[], progressor:[]};
+  const score = {}, why = {};
+  ROLE_ORDER.forEach(r=>{score[r]=0; why[r]=[];});
   const add=(r,pts,txt)=>{score[r]+=pts; if(txt) why[r].push(txt);};
 
-  const p = t.pct;
-  if(p.npxG90 < 50)  add('finisher', 50-p.npxG90, '기회 창출 백분위 '+f1(p.npxG90));
+  const p = t.pct, bp = t.by_pos;
+  if(p.xG90 < 50)      add('finisher', 50-p.xG90, '기회 창출 백분위 '+f1(p.xG90));
   if(p.finishing < 50) add('finisher', (50-p.finishing)*0.8, '결정력 백분위 '+f1(p.finishing));
-  if(t.by_pos.FW.pct.npxG90 < 50) add('finisher', (50-t.by_pos.FW.pct.npxG90)*1.1, '공격수 득점 생산 백분위 '+f1(t.by_pos.FW.pct.npxG90));
+  if(bp.ST.pct.npxG90 < 50) add('finisher', (50-bp.ST.pct.npxG90)*1.1, '스트라이커 득점 생산 백분위 '+f1(bp.ST.pct.npxG90));
 
-  if(p.deep90 < 50) add('creator', 50-p.deep90, '최종지역 침투 백분위 '+f1(p.deep90));
-  if(t.by_pos.MF.pct.xA90 < 50) add('creator', (50-t.by_pos.MF.pct.xA90)*1.2, '미드필더 기회 제공 백분위 '+f1(t.by_pos.MF.pct.xA90));
-  if(t.by_pos.FW.pct.xA90 < 50) add('creator', (50-t.by_pos.FW.pct.xA90)*0.6, '공격수 연계 백분위 '+f1(t.by_pos.FW.pct.xA90));
+  if(p.box90 < 50)       add('creator', 50-p.box90, '박스 침투 백분위 '+f1(p.box90));
+  if(bp.AM.pct.xA90 < 50) add('creator', 50-bp.AM.pct.xA90, '공격형·측면 기회 제공 백분위 '+f1(bp.AM.pct.xA90));
+  if(bp.CM.pct.xA90 < 50) add('creator', (50-bp.CM.pct.xA90)*0.6, '중앙 미드필더 기회 제공 백분위 '+f1(bp.CM.pct.xA90));
 
-  if(p.ppda_allowed < 50) add('progressor', 50-p.ppda_allowed, '압박 회피 백분위 '+f1(p.ppda_allowed));
-  if(t.by_pos.DF.pct.xA90 < 50) add('progressor', (50-t.by_pos.DF.pct.xA90)*0.7, '수비진 전진 기여 백분위 '+f1(t.by_pos.DF.pct.xA90));
-  if(p.deep90 < 50) add('progressor', (50-p.deep90)*0.5, null);
+  if(p.poss < 50)  add('progressor', (50-p.poss)*0.8, '점유 백분위 '+f1(p.poss));
+  if(p.box90 < 50) add('progressor', (50-p.box90)*0.4, null);
 
-  const order = Object.keys(score).sort((a,b)=>score[b]-score[a]);
-  const defWeak = (p.npxGA90 < 40 || p.deep_allowed90 < 40 || p.keeping < 40);
+  if(p.press90 < 50)    add('ballwinner', 50-p.press90, '전방 압박 백분위 '+f1(p.press90));
+  if(p.defact_adj < 50) add('ballwinner', (50-p.defact_adj)*0.8, '수비 활동량(점유 보정) 백분위 '+f1(p.defact_adj));
+
+  if(p.xGA90 < 50)   add('boxdef', 50-p.xGA90, '기회 억제 백분위 '+f1(p.xGA90));
+  if(p.keeping < 50) add('boxdef', (50-p.keeping)*0.4, '실점 억제 백분위 '+f1(p.keeping));
+
+  const order = ROLE_ORDER.slice().sort((a,b)=>score[b]-score[a]);
+  if(!S.role) S.role = order[0];
 
   const box=$('#needs'); box.innerHTML='';
-  if(!S.role) S.role = score[order[0]] > 0 ? order[0] : 'allround';
-  const chipList = order.concat(['allround']);
-  chipList.forEach(r=>{
+  order.forEach(r=>{
     const b=el('button','chip', D.roles[r] + (score[r]>0? ' <span class="bd">우선도 '+Math.round(score[r])+'</span>':''));
     b.setAttribute('aria-pressed', String(S.role===r));
     b.addEventListener('click',()=>{S.role=r; needs({t}); renderCandidates();});
@@ -610,63 +598,60 @@ function needs(diag){
   });
 
   const w = why[S.role] || [];
-  let html = '';
-  if(w.length){
-    html += '<div class="note"><b>'+D.roles[S.role]+'</b> 자원이 필요한 근거 — ' + w.join(' · ') + '. 아래 명단은 두 리그 전체에서 이 역할 점수가 높은 순입니다.</div>';
-  } else {
-    html += '<div class="note">이 역할은 현재 스쿼드의 뚜렷한 약점으로 잡히지 않았습니다. 참고용 명단으로 보세요.</div>';
-  }
-  if(defWeak){
-    html += '<div class="note" style="margin-top:10px;border-color:var(--warn);color:var(--ink-2)"><b>수비 쪽 약점이 더 큽니다.</b> 다만 Understat에는 태클·인터셉트·경합 같은 수비 지표가 없어, 이 사이트는 수비수 후보를 추천하지 않습니다. 수비 보강은 별도 데이터가 필요합니다.</div>';
-  }
-  $('#needNote').innerHTML = html;
+  const grp = D.role_groups[S.role].map(g=>POSNAME[g]).join('·');
+  $('#needNote').innerHTML = w.length
+    ? '<div class="note"><b>'+D.roles[S.role]+'</b> 자원이 필요한 근거 — ' + w.join(' · ') + '. 아래 명단은 두 리그의 '+grp+' 중 이 역할 점수가 높은 순입니다.</div>'
+    : '<div class="note">이 역할은 현재 스쿼드의 뚜렷한 약점으로 잡히지 않았습니다. 참고용 명단으로 보세요 (대상: '+grp+').</div>';
 }
 
 /* ---- 4. candidates ---- */
-const PM = [
-  ['npxG90','득점 기대값'], ['sh90','슈팅'], ['xA90','기회 제공'],
-  ['kp90','키패스'], ['xGChain90','공격 관여'], ['xGBuildup90','빌드업 관여']
-];
+const groupsNow = () => S.pos!=='ALL' ? [S.pos] : D.role_groups[S.role];
 
 function candidatePool(){
-  const t = team();
-  let posFilter = S.role==='progressor' ? ['MF','DF'] : ['FW','MF'];
-  if(S.pos!=='ALL') posFilter = [S.pos];
+  const t = team(), groups = groupsNow();
   return D.players.filter(p=>{
-    if(p.t===t.name && p.l===S.lg) return false;
+    if(p.tid===t.id && p.l===S.lg) return false;
     if(S.cross && p.l===S.lg) return false;
     if(p.m < S.mins) return false;
-    return posFilter.includes(p.p);
+    return groups.includes(p.p);
   }).sort((a,b)=> b.r[S.role]-a.r[S.role]);
 }
 
 function renderCandidates(){
-  const t = team();
   const list = candidatePool();
   const top = list.slice(0,15);
-  $('#candHint').textContent = D.roles[S.role] + ' · ' + list.length + '명 중 상위 15명 · ' + S.mins + '분 이상'
-    + (S.cross? ' · 상대 리그만':'') + (S.pos!=='ALL'? ' · '+POSNAME[S.pos]:'');
+  const [ka, kb] = ROLECOLS[S.role];
+  $('#colA').textContent = MLAB[ka];
+  $('#colB').textContent = MLAB[kb];
+  $('#candHint').textContent = D.roles[S.role] + ' · ' + groupsNow().map(g=>POSNAME[g]).join('·') + ' ' + list.length + '명 중 상위 15명 · ' + S.mins + '분 이상'
+    + (S.cross? ' · 상대 리그만':'');
 
   const body = $('#candBody'); body.innerHTML='';
   top.forEach((p,i)=>{
     const tr = el('tr');
     tr.innerHTML =
       '<td class="rank num">'+(i+1)+'</td>'+
-      '<td><div class="pname">'+p.n+'</div><div class="psub">'+p.t+' · '+LGSHORT[p.l]+'</div></td>'+
+      '<td><div class="pname">'+esc(p.n)+'</div><div class="psub">'+esc(p.t)+' · '+LGSHORT[p.l]+'</div></td>'+
       '<td><span class="tag">'+POSNAME[p.p]+'</span></td>'+
       '<td class="n">'+p.m+'′<div class="psub">'+p.gm+'경기</div></td>'+
       '<td class="n">'+(p.g+p.a)+'<div class="psub">'+p.g+'G '+p.a+'A</div></td>'+
-      '<td class="n">'+f2(p.npxG90)+'</td>'+
-      '<td class="n">'+f2(p.xA90)+'</td>'+
+      '<td class="n">'+f2(p[ka])+'</td>'+
+      '<td class="n">'+f2(p[kb])+'</td>'+
       '<td><div class="score"><span class="b"><i style="width:'+p.r[S.role]+'%"></i></span><span class="num">'+f1(p.r[S.role])+'</span></div></td>';
     const det = el('tr','detail');
     const td = el('td'); td.colSpan = 8;
+    const extra = [];
+    if(p.rating!=null) extra.push('평점 <span class="num">'+f2(p.rating)+'</span>');
+    if(p.lbp90!=null) extra.push('라인 브레이킹 패스 <span class="num">'+f2(p.lbp90)+'</span>/90');
+    if(p.now) extra.push(D.meta.form_season+' 현재 '+p.now.m+'분 '+p.now.g+'골 '+p.now.a+'도움');
     td.innerHTML = '<div class="pbars">' + PM.map(([k,lab])=>{
       const v=p.pc[k];
       return '<div class="pb"><span class="t">'+lab+'</span><span class="track"><i class="'+(v<50?'low':'')+'" style="width:'+v+'%"></i></span><span class="v">'+f1(v)+'</span></div>';
     }).join('') + '</div>' +
-    '<p style="margin:12px 0 0;font-size:12.5px;color:var(--ink-2)">위 막대는 '+POSNAME[p.p]+' 그룹 안에서의 백분위입니다 (역할 점수는 포지션 구분 없이 후보 풀 전체 기준). 결정력 초과 <span class="num">'+(p.fin>=0?'+':'')+f2(p.fin)+'</span>골 (실제 논페널티 득점 − npxG)'+
-    (p.now? ' · '+D.meta.form_season+' 현재 '+p.now.m+'분 '+p.now.g+'골 '+p.now.a+'도움':'')+'</p>';
+    '<p style="margin:12px 0 0;font-size:12.5px;color:var(--ink-2)">위 막대는 '+peerName(p.pg)+' 그룹 안에서의 백분위입니다'
+      + (p.pg.indexOf('+')>=0 ? ' (인원이 적어 그룹을 합쳤습니다)' : '')
+      + ' — 역할 점수는 포지션 구분 없이 후보 풀 전체 기준. 결정력 초과 <span class="num">'+(p.fin>=0?'+':'')+f2(p.fin)+'</span>골 (논페널티 득점 − npxG 근사)'
+      + (extra.length? ' · '+extra.join(' · '):'')+'</p>';
     det.appendChild(td); det.style.display='none';
     tr.addEventListener('click',()=>{
       const open = det.style.display!=='none';
@@ -679,17 +664,31 @@ function renderCandidates(){
   });
 
   renderScatter(top, list);
+  renderExcluded();
+  if(BT) renderBacktest();
+}
+
+/* 출전 경기 부족으로 순위에서 빠진 선수 (data.json의 excluded) */
+function renderExcluded(){
+  const t = team(), groups = groupsNow(), all = D.excluded || [];
+  const ex = all.filter(p=> groups.includes(p.p) && !(p.tid===t.id && p.l===S.lg) && !(S.cross && p.l===S.lg));
+  $('#exclN').textContent = ex.length + '명 (전체 ' + all.length + '명)';
+  $('#exclBody').innerHTML = ex.length ? ex.map(p=>'<tr style="cursor:default"><td><div class="pname">'+esc(p.n)+'</div><div class="psub">'+esc(p.t)+' · '+LGSHORT[p.l]+'</div></td>'
+    + '<td><span class="tag">'+POSNAME[p.p]+'</span></td><td class="n">'+p.m+'′</td><td class="n">'+p.gm+' / '+p.team_mp+'</td></tr>').join('')
+    : '<tr style="cursor:default"><td colspan="4">해당 선수 없음</td></tr>';
 }
 
 function renderScatter(top, list){
   const t = team();
-  const squad = D.players.filter(p=>p.t===t.name && p.l===S.lg);
+  const [ka, kb] = ROLECOLS[S.role];
+  $('#scatterT').textContent = '후보 지형 · ' + MLAB[ka] + ' 대 ' + MLAB[kb];
+  const squad = D.players.filter(p=>p.tid===t.id && p.l===S.lg);
   const others = list.slice(10);
   const highlight = top.slice(0,10);
   const all = list.concat(squad);
   const W=400,H=290,ml=42,mr=14,mt=14,mb=36;
-  const mx = Math.max(0.05, ...all.map(p=>p.npxG90))*1.08;
-  const my = Math.max(0.05, ...all.map(p=>p.xA90))*1.08;
+  const mx = Math.max(0.05, ...all.map(p=>p[ka]))*1.08;
+  const my = Math.max(0.05, ...all.map(p=>p[kb]))*1.08;
   const X = v=>ml+v/mx*(W-ml-mr), Y = v=>H-mb-v/my*(H-mt-mb);
   let g='';
   for(let i=0;i<=3;i++){
@@ -700,10 +699,10 @@ function renderScatter(top, list){
     const v=my*i/3; g+='<line x1="'+ml+'" y1="'+Y(v)+'" x2="'+(W-mr)+'" y2="'+Y(v)+'" stroke="var(--line)" stroke-width="1"/>';
     g+='<text x="'+(ml-7)+'" y="'+(Y(v)+4)+'" text-anchor="end" font-size="10" fill="var(--ink-3)" font-family="IBM Plex Mono,monospace">'+f2(v)+'</text>';
   }
-  g+='<text x="'+((ml+W-mr)/2)+'" y="'+(H-6)+'" text-anchor="middle" font-size="10.5" fill="var(--ink-3)">npxG / 90분</text>';
-  g+='<text x="12" y="'+((mt+H-mb)/2)+'" text-anchor="middle" font-size="10.5" fill="var(--ink-3)" transform="rotate(-90 12 '+((mt+H-mb)/2)+')">xA / 90분</text>';
+  g+='<text x="'+((ml+W-mr)/2)+'" y="'+(H-6)+'" text-anchor="middle" font-size="10.5" fill="var(--ink-3)">'+MLAB[ka]+'</text>';
+  g+='<text x="12" y="'+((mt+H-mb)/2)+'" text-anchor="middle" font-size="10.5" fill="var(--ink-3)" transform="rotate(-90 12 '+((mt+H-mb)/2)+')">'+MLAB[kb]+'</text>';
 
-  const dot=(p,fill,r,ring)=>'<circle cx="'+X(p.npxG90).toFixed(1)+'" cy="'+Y(p.xA90).toFixed(1)+'" r="'+r+'" fill="'+fill+'"'+(ring?' stroke="var(--surface)" stroke-width="2"':'')+' data-n="'+encodeURIComponent(p.n)+'" data-t="'+encodeURIComponent(p.t)+'" data-x="'+f2(p.npxG90)+'" data-y="'+f2(p.xA90)+'"/>';
+  const dot=(p,fill,r,ring)=>'<circle cx="'+X(p[ka]).toFixed(1)+'" cy="'+Y(p[kb]).toFixed(1)+'" r="'+r+'" fill="'+fill+'"'+(ring?' stroke="var(--surface)" stroke-width="2"':'')+' data-n="'+encodeURIComponent(p.n)+'" data-t="'+encodeURIComponent(p.t)+'" data-x="'+f2(p[ka])+'" data-y="'+f2(p[kb])+'"/>';
   others.forEach(p=>{g+=dot(p,'var(--ink-3)',3.2,false);});
   squad.forEach(p=>{ if(p.m>=S.mins) g+=dot(p,'var(--s1)',5,true); });
   highlight.forEach(p=>{g+=dot(p,'var(--s2)',5.5,true);});
@@ -712,20 +711,20 @@ function renderScatter(top, list){
       !boxes.some(b=> x0<b.x+b.w+3 && x0+w+3>b.x && y0<b.y+b.h+2 && y0+h+2>b.y);
   highlight.slice(0,3).forEach(p=>{
     const nm=p.n.split(' ').slice(-1)[0];
-    const w=nm.length*5.6+2, h=11, cx=X(p.npxG90), cy=Y(p.xA90);
-    const opts=[[cx+9,cy-5.5,'start'],[cx-9-w,cy-5.5,'start'],[cx-w/2,cy-15,'start'],[cx-w/2,cy+7,'start']];
+    const w=nm.length*5.6+2, h=11, cx=X(p[ka]), cy=Y(p[kb]);
+    const opts=[[cx+9,cy-5.5],[cx-9-w,cy-5.5],[cx-w/2,cy-15],[cx-w/2,cy+7]];
     for(const [ox,oy] of opts){
       if(fits(ox,oy,w,h)){
         boxes.push({x:ox,y:oy,w,h});
-        g+='<text x="'+ox.toFixed(1)+'" y="'+(oy+8.5).toFixed(1)+'" font-size="10.5" fill="var(--ink-2)" font-weight="600" paint-order="stroke" stroke="var(--surface)" stroke-width="3">'+nm+'</text>';
+        g+='<text x="'+ox.toFixed(1)+'" y="'+(oy+8.5).toFixed(1)+'" font-size="10.5" fill="var(--ink-2)" font-weight="600" paint-order="stroke" stroke="var(--surface)" stroke-width="3">'+esc(nm)+'</text>';
         break;
       }
     }
   });
   const box=$('#scatter');
-  box.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="후보 선수 득점 기대값 대 기회 제공 산점도">'+g+'</svg>';
+  box.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="후보 선수 '+MLAB[ka]+' 대 '+MLAB[kb]+' 산점도">'+g+'</svg>';
   box.querySelectorAll('circle').forEach(c=>{
-    c.addEventListener('mousemove',e=>showTip('<b>'+decodeURIComponent(c.dataset.n)+'</b><br>'+decodeURIComponent(c.dataset.t)+'<br>npxG/90 <span class="num">'+c.dataset.x+'</span> · xA/90 <span class="num">'+c.dataset.y+'</span>',e.clientX,e.clientY));
+    c.addEventListener('mousemove',e=>showTip('<b>'+esc(decodeURIComponent(c.dataset.n))+'</b><br>'+esc(decodeURIComponent(c.dataset.t))+'<br>'+MLAB[ka]+' <span class="num">'+c.dataset.x+'</span> · '+MLAB[kb]+' <span class="num">'+c.dataset.y+'</span>',e.clientX,e.clientY));
     c.addEventListener('mouseleave',hideTip);
   });
 }
@@ -733,8 +732,7 @@ function renderScatter(top, list){
 /* ---- render all ---- */
 function render(){
   renderTeam();
-  renderTrend();
-  const diag = findings();
+  findings();
   needs({t:team()});
   renderCandidates();
 }
@@ -742,77 +740,80 @@ function render(){
 /* ---- 6. 모델 검증 (backtest.json — 없으면 섹션을 숨긴 채 넘어간다) ---- */
 let BT = null;
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const f3 = n => (Math.round(n*1000)/1000).toFixed(3);
 
 function renderBacktest(){
-  const done = BT && BT.pairs ? BT.pairs.filter(p=>!p.skipped) : [];
-  if(!done.length) return;
+  if(!BT || !BT.pairs || !BT.pairs.length || !BT.meta || !BT.meta.roles) return;
   $('#s-backtest').hidden = false;
+  const M = BT.meta, V = BT.verdict || {};
+  $('#btHint').textContent = '완주 시즌 쌍 ' + M.pairs.join(' · ') + ' · 두 시즌 모두 후보 풀에 든 선수 · K는 시험 쌍을 뺀 쌍으로 추정';
 
-  const v = BT.verdict || {};
-  $('#btHint').textContent = BT.meta.role_label + '으로 ' + BT.meta.target + '을 예측 · '
-    + done.map(p=>p.pair+' n='+p.n).join(' · ');
-  const mark = ok => ok ? '<b>예</b>' : '<b>아니오</b>';
+  // 판정문은 backtest.json에 검증 스크립트가 쓴 문장을 그대로 보여준다.
   $('#btVerdict').innerHTML =
-    '<b>이 모델이 실제로 예측력이 있나.</b> 아래는 N시즌 역할 점수로 N+1시즌 실제 생산을 맞혀 본 결과입니다.'
+    '<b>이 모델이 실제로 예측력이 있나.</b> N시즌 역할 점수로 N+1시즌을 맞혀 본 결과이고, 아래 판정문은 검증 스크립트가 쓴 문장 그대로입니다. '
+    + '빌드업·볼 탈취·박스 수비는 예측 대상이 자기 지표라 "원지표를 이기는가"가 성립하지 않아 다음 시즌에도 유지되는지(r)만 봅니다.'
     + '<ul style="margin:8px 0 0;padding-left:18px">'
-    + '<li>축소가 예측력을 올렸나 — ' + mark(v.shrink_beats_raw) + '</li>'
-    + '<li>단순 "지난 시즌 골 수"보다 나은가 — ' + mark(v.model_beats_goals) + '</li>'
-    + '<li>지난 시즌 (npxG+xA)/90을 그대로 쓴 것보다 나은가 — ' + mark(v.model_beats_prev_output)
-    + (v.model_beats_prev_output ? '' : ' · 역할 점수는 여러 지표를 묶은 종합 점수라 이 특정 대상 하나를 맞히는 데는 같은 지표를 그대로 쓰는 쪽이 낫습니다. 숨기지 않고 적어 둡니다.')
-    + '</li></ul>';
+    + Object.keys(M.roles).filter(k=>V[k]).map(k=>'<li><b>'+esc(M.roles[k].label)+'</b> — '+esc(V[k].text)+'</li>').join('')
+    + (V.attack ? '<li><b>참고</b> — '+esc(V.attack.text)+'</li>' : '')
+    + '</ul>';
 
+  $('#btHead').innerHTML = '<th>역할 · 방법</th>' + M.pairs.map(p=>'<th class="n" style="text-align:right">'+esc(p)+' r</th>').join('');
   const body = $('#btBody'); body.innerHTML='';
-  const order = ['model_adj','model_raw','goals','prev_out'];
-  done.forEach(p=>{
-    const h = el('tr'); h.innerHTML = '<td colspan="4" style="font-weight:600">'+esc(p.pair)+' · 양 시즌 '+BT.meta.pool_min+'분 이상 <span class="num">'+p.n+'</span>명</td>';
+  Object.keys(M.roles).forEach(rk=>{
+    const tgt = M.targets[rk], retention = V[rk] && V[rk].kind==='retention';
+    const h = el('tr'); h.style.cursor='default';
+    h.innerHTML = '<td colspan="'+(1+M.pairs.length)+'" style="font-weight:600;background:var(--surface-2)">'+esc(M.roles[rk].label)
+      + ' <span class="psub">대상: '+esc(tgt.target)+' · n '+BT.pairs.map(p=>p.roles[rk].n).join(' / ')+'</span></td>';
     body.appendChild(h);
-    const best = Math.max(...order.map(k=>p.methods[k].r));
-    order.forEach(k=>{
-      const m = p.methods[k], tr = el('tr');
-      const nm = esc(BT.meta.labels[k]) + (k==='model_adj' ? ' ←' : '');
-      tr.innerHTML = '<td'+(m.r===best?' style="font-weight:600"':'')+'>'+nm+'</td>'
-        + '<td class="n" style="text-align:right">'+f2(m.r)+'</td>'
-        + '<td class="n" style="text-align:right">'+f2(m.rho)+'</td>'
-        + '<td class="n" style="text-align:right">'+f2(m.r2)+'</td>';
+    const single = Object.keys((D.role_weights||{})[rk]||{}).length===1;
+    ['z_adj','pct_adj','prev'].forEach(k=>{
+      if(retention && k==='prev') return;   // 대상이 자기 자신이라 '원지표 그대로' 비교가 성립하지 않는다
+      if(single && k==='pct_adj') return;   // 지표가 하나면 이 줄은 '이전 모델'이 아니라 같은 지표의 백분위일 뿐이다
+      const tr = el('tr'); tr.style.cursor='default';
+      const lab = k==='prev' ? tgt.baseline+' 그대로' : M.labels[k];
+      tr.innerHTML = '<td'+(k==='z_adj'?' style="font-weight:600"':'')+'>'+esc(lab)+'</td>'
+        + BT.pairs.map(p=>{const c=p.roles[rk].methods[k].all; return '<td class="n" style="text-align:right">'+(c.r==null?'—':f3(c.r))+'</td>';}).join('');
       body.appendChild(tr);
     });
   });
-
-  btScatter(done[done.length-1]);
+  btScatter();
 }
 
-function btScatter(p){
-  $('#btScatterT').textContent = p.pair + ' · 역할 점수 대 실제 생산';
-  const pts = p.scatter || [];
-  if(!pts.length) return;
+function btScatter(){
+  const rk = S.role || 'finisher';
+  const pr = BT.pairs[BT.pairs.length-1], R = pr.roles[rk];
+  const pts = (R && R.scatter) || [];
+  const [from, to] = pr.pair.split('→');
+  $('#btScatterT').textContent = pr.pair + ' · ' + BT.meta.roles[rk].label + ' · r ' + (R ? f3(R.methods.z_adj.all.r) : '—');
+  if(!pts.length){ $('#btScatter').innerHTML=''; return; }
   const W=400,H=290,ml=44,mr=14,mt=14,mb=38;
-  const my = Math.max(0.1, ...pts.map(d=>d.y))*1.08;
-  const X = v=>ml+v/100*(W-ml-mr), Y = v=>H-mb-v/my*(H-mt-mb);
+  const xs=pts.map(d=>d.x), ys=pts.map(d=>d.y);
+  let x0=Math.min(...xs), x1=Math.max(...xs), y0=Math.min(0,...ys), y1=Math.max(...ys);
+  const px=(x1-x0)*0.05||1, py=(y1-y0)*0.06||1; x0-=px; x1+=px; y1+=py; if(y0<0) y0-=py;
+  const X=v=>ml+(v-x0)/(x1-x0)*(W-ml-mr), Y=v=>H-mb-(v-y0)/(y1-y0)*(H-mt-mb);
   let g='';
   for(let i=0;i<=4;i++){
-    const v=100*i/4; g+='<line x1="'+X(v)+'" y1="'+mt+'" x2="'+X(v)+'" y2="'+(H-mb)+'" stroke="var(--line)" stroke-width="1"/>';
-    g+='<text x="'+X(v)+'" y="'+(H-mb+15)+'" text-anchor="middle" font-size="10" fill="var(--ink-3)" font-family="IBM Plex Mono,monospace">'+v+'</text>';
+    const v=x0+(x1-x0)*i/4; g+='<line x1="'+X(v)+'" y1="'+mt+'" x2="'+X(v)+'" y2="'+(H-mb)+'" stroke="var(--line)" stroke-width="1"/>';
+    g+='<text x="'+X(v)+'" y="'+(H-mb+15)+'" text-anchor="middle" font-size="10" fill="var(--ink-3)" font-family="IBM Plex Mono,monospace">'+f1(v)+'</text>';
   }
   for(let i=0;i<=3;i++){
-    const v=my*i/3; g+='<line x1="'+ml+'" y1="'+Y(v)+'" x2="'+(W-mr)+'" y2="'+Y(v)+'" stroke="var(--line)" stroke-width="1"/>';
+    const v=y0+(y1-y0)*i/3; g+='<line x1="'+ml+'" y1="'+Y(v)+'" x2="'+(W-mr)+'" y2="'+Y(v)+'" stroke="var(--line)" stroke-width="1"/>';
     g+='<text x="'+(ml-7)+'" y="'+(Y(v)+4)+'" text-anchor="end" font-size="10" fill="var(--ink-3)" font-family="IBM Plex Mono,monospace">'+f2(v)+'</text>';
   }
-  g+='<text x="'+((ml+W-mr)/2)+'" y="'+(H-6)+'" text-anchor="middle" font-size="10.5" fill="var(--ink-3)">'+esc(p.from_season)+' 역할 점수</text>';
-  g+='<text x="12" y="'+((mt+H-mb)/2)+'" text-anchor="middle" font-size="10.5" fill="var(--ink-3)" transform="rotate(-90 12 '+((mt+H-mb)/2)+')">'+esc(p.to_season)+' (npxG+xA)/90</text>';
-
-  pts.forEach(d=>{ g+='<circle cx="'+X(d.x).toFixed(1)+'" cy="'+Y(d.y).toFixed(1)+'" r="3" fill="var(--s1)" opacity="0.45" data-n="'+encodeURIComponent(d.n)+'" data-t="'+encodeURIComponent(d.t)+'" data-x="'+f1(d.x)+'" data-y="'+f2(d.y)+'"/>'; });
-
-  const n=pts.length, sx=pts.reduce((a,d)=>a+d.x,0), sy=pts.reduce((a,d)=>a+d.y,0);
-  const sxy=pts.reduce((a,d)=>a+d.x*d.y,0), sxx=pts.reduce((a,d)=>a+d.x*d.x,0);
+  g+='<text x="'+((ml+W-mr)/2)+'" y="'+(H-6)+'" text-anchor="middle" font-size="10.5" fill="var(--ink-3)">'+esc(from)+' 역할 점수 (z 합성값)</text>';
+  g+='<text x="12" y="'+((mt+H-mb)/2)+'" text-anchor="middle" font-size="10.5" fill="var(--ink-3)" transform="rotate(-90 12 '+((mt+H-mb)/2)+')">'+esc(to)+' '+esc(BT.meta.targets[rk].target.replace('다음 시즌 ',''))+'</text>';
+  pts.forEach(d=>{ g+='<circle cx="'+X(d.x).toFixed(1)+'" cy="'+Y(d.y).toFixed(1)+'" r="3" fill="var(--s1)" opacity="0.45"/>'; });
+  const n=pts.length, sx=xs.reduce((a,v)=>a+v,0), sy=ys.reduce((a,v)=>a+v,0);
+  const sxy=pts.reduce((a,d)=>a+d.x*d.y,0), sxx=xs.reduce((a,v)=>a+v*v,0);
   const den=n*sxx-sx*sx;
   if(den!==0){
     const b=(n*sxy-sx*sy)/den, a=(sy-b*sx)/n;
-    const x0=0,x1=100;
-    g+='<line x1="'+X(x0)+'" y1="'+Y(Math.max(0,a+b*x0))+'" x2="'+X(x1)+'" y2="'+Y(Math.min(my,a+b*x1))+'" stroke="var(--s2)" stroke-width="2"/>';
+    const cl=v=>Math.min(y1,Math.max(y0,v));
+    g+='<line x1="'+X(x0)+'" y1="'+Y(cl(a+b*x0))+'" x2="'+X(x1)+'" y2="'+Y(cl(a+b*x1))+'" stroke="var(--s2)" stroke-width="2"/>';
   }
   const boxes=[];
-  const fits=(x0,y0,w,h)=> x0>ml-2 && x0+w<W-mr+2 && y0>mt && y0+h<H-mb &&
-      !boxes.some(b=> x0<b.x+b.w+3 && x0+w+3>b.x && y0<b.y+b.h+2 && y0+h+2>b.y);
+  const fits=(bx,by,w,h)=> bx>ml-2 && bx+w<W-mr+2 && by>mt && by+h<H-mb &&
+      !boxes.some(q=> bx<q.x+q.w+3 && bx+w+3>q.x && by<q.y+q.h+2 && by+h+2>q.y);
   pts.slice().sort((a,b)=>b.y-a.y).slice(0,5).forEach(d=>{
     const nm=d.n.split(' ').slice(-1)[0];
     const w=nm.length*5.6+2, h=11, cx=X(d.x), cy=Y(d.y);
@@ -825,7 +826,7 @@ function btScatter(p){
       }
     }
   });
-  $('#btScatter').innerHTML='<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="역할 점수 대 다음 시즌 실제 생산 산점도">'+g+'</svg>';
+  $('#btScatter').innerHTML='<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="역할 점수 대 다음 시즌 값 산점도">'+g+'</svg>';
 }
 
 async function boot(){
@@ -851,7 +852,7 @@ async function boot(){
     const b = await fetch('backtest.json?t=' + Date.now(), {cache:'no-store'});
     if(b.ok){ BT = await b.json(); renderBacktest(); }
   }catch(e){ /* 섹션을 숨긴 채 넘어간다 */ }
-  addEventListener('resize',()=>{renderTrend();renderCandidates(); if(BT) renderBacktest();});
+  addEventListener('resize',()=>{renderCandidates();});
 }
 boot();
 })();

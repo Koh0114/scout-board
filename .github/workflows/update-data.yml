@@ -30,8 +30,10 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Understat 내려받기
-        run: python scripts/fetch_understat.py
+      # Understat은 2026-11-01부터 점검 페이지만 반환해 FotMob으로 교체했다.
+      # scripts/fetch_understat.py는 남겨 두지만 호출하지 않는다.
+      - name: FotMob 내려받기
+        run: python scripts/fetch_fotmob.py
 
       - name: data.json / index.html 생성
         run: python scripts/build.py

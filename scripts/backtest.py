@@ -49,6 +49,9 @@ TARGET = {
     "boxdef":     ("다음 시즌 같은 지표 (z-합성)", "지난 시즌 같은 지표", None),
 }
 POSS_ROLES = ["ballwinner", "boxdef"]
+# 원지표와의 r 차이가 두 쌍 모두 이 안쪽이면 '비슷한 수준'이라고 쓴다. 시즌쌍 2개로는
+# 이 정도 차이를 우열로 읽을 수 없다. 판정문에 '이겼다'는 쓰지 않는다.
+SIMILAR = 0.03
 ATTACK_GROUPS = ["ST", "AM"]
 
 
@@ -147,16 +150,23 @@ def verdict(results):
             lines.append(f"다음 시즌에도 유지되는가: 현재 모델 r={d[DEPLOYED]}, rho={rho}")
         else:
             dep = beats(d[DEPLOYED], d["prev"])
-            lines.append(("현재 모델이 지난 시즌 원지표 그대로를 이겼다" if dep else
-                          "현재 모델이 지난 시즌 원지표 그대로를 못 이겼다")
-                         + f" (모델 r={d[DEPLOYED]}, 원지표 r={d['prev']})")
+            diff = [round(x - y, 3) for x, y in zip(d[DEPLOYED], d["prev"])]
+            base = TARGET[rk][1]
             if single:
-                gain = [round(x - y, 3) for x, y in zip(d[DEPLOYED], d["prev"])]
-                lines.append(f"이 역할은 지표가 하나라 원지표와의 차이 {gain}는 축소 효과뿐이다")
-            elif best != DEPLOYED:
-                bw = beats(d[best], d["prev"])
-                lines.append(f"가장 나은 변형({LABEL[best]})은 " + ("이겼다" if bw else "못 이겼다")
-                             + f" (r={d[best]})")
+                head = f"원지표({base})와 같은 지표, 축소 효과만큼 높음"
+            elif all(abs(x) < SIMILAR for x in diff):
+                head = f"원지표({base})와 비슷한 수준"
+            elif all(x < 0 for x in diff):
+                head = f"원지표({base})보다 낮음"
+            else:
+                head = f"원지표({base})와 쌍마다 엇갈림"
+            lines.append(head + f" (현재 모델 r={d[DEPLOYED]}, 원지표 r={d['prev']}, 차이 {diff})")
+            mv_m, mv_p = rs(results, rk, DEPLOYED, "movers"), rs(results, rk, "prev", "movers")
+            low = [p["pair"] for p, a_, b_ in zip(results, mv_m, mv_p)
+                   if a_ is not None and b_ is not None and a_ < b_]
+            if low and not single:
+                lines.append(f"이적 선수만 보면 {', '.join(low)}에서 원지표보다 낮다 "
+                             f"(모델 r={mv_m}, 원지표 r={mv_p})")
         z_win, pct_win = beats(d["z_adj"], d["pct_adj"]), beats(d["pct_adj"], d["z_adj"])
         if not single:
             lines.append(("z-점수가 이전 모델(백분위 가중합)보다 두 쌍 모두 낫다" if z_win else

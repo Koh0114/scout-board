@@ -172,7 +172,7 @@ def rnd(x, k=3):
 
 
 def slim(p):
-    o = dict(id=p["id"], n=p["name"], t=p["team"], l=p["league"], p=p["pos"], pg=p["peer"],
+    o = dict(id=p["id"], n=p["name"], t=p["team"], tid=p["team_id"], l=p["league"], p=p["pos"], pg=p["peer"],
              pc_codes=p["pos_codes"], m=p["mins"], gm=p["games"], g=p["g"], pk=p["pkg"],
              a=p["a"], xG=rnd(p["xG"], 2), fin=round(p["fin"], 2))
     for k in PLAYER_METRICS:
@@ -207,7 +207,7 @@ out = dict(
     teams={lg: list(tt.values()) for lg, tt in teams.items()},
     players=[slim(p) for p in pool],
     # 7단계: 사이트에서 "출전 경기 부족으로 순위 제외"로 따로 보여준다
-    excluded=[dict(id=p["id"], n=p["name"], t=p["team"], l=p["league"], p=p["pos"],
+    excluded=[dict(id=p["id"], n=p["name"], t=p["team"], tid=p["team_id"], l=p["league"], p=p["pos"],
                    m=p["mins"], gm=p["games"], team_mp=p["team_mp"])
               for p in sorted(excluded, key=lambda p: -p["mins"])],
     roles={k: v["label"] for k, v in ROLES.items()},
@@ -225,7 +225,7 @@ i = tpl.index(SPLIT)
 head_part, body_part = tpl[:i], tpl[i:]
 html = ('<!doctype html>\n<html lang="ko">\n<head>\n<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width,initial-scale=1">\n'
-        '<meta name="description" content="프리미어리그·라리가 팀을 xG 지표로 진단하고 '
+        '<meta name="description" content="프리미어리그·라리가 팀을 FotMob 지표로 진단하고 '
         '필요한 자원을 찾는 스카우팅 대시보드">\n'
         '<link rel="icon" href="data:image/svg+xml,'
         '%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E'

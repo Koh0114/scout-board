@@ -1,13 +1,19 @@
 # Scout Board
 
-프리미어리그·라리가 팀을 xG 기반 지표로 진단하고, 그 팀에 부족한 역할을 채울 선수를
+프리미어리그·라리가 팀을 xG·압박·수비 지표로 진단하고, 그 팀에 부족한 역할을 채울 선수를
 두 리그 전체에서 찾는 스카우팅 대시보드. 데이터는 GitHub Actions가 **매일 자동으로** 다시 내려받는다.
+
+데이터 소스는 **FotMob**이다. 2026년 10월까지는 Understat을 썼는데, 11월 1일부터 Understat이
+점검 페이지만 반환하는 장애가 이어져 교체했다. 경위와 FotMob 데이터 규약은 `FOTMOB_MIGRATION.md`.
 
 ## 구조
 
 ```
-scripts/fetch_understat.py   Understat → data/understat_raw.json   (커밋 안 함)
+scripts/fetch_fotmob.py      FotMob → data/fotmob_raw.json   (커밋 안 함)
+scripts/model.py             지표·포지션 그룹·축소·역할 점수 (build와 backtest가 공유)
 scripts/build.py             raw → docs/data.json + docs/index.html
+scripts/backtest.py          raw → docs/backtest.json (모델 검증)
+scripts/fetch_understat.py   예전 수집기. 남겨 두지만 쓰지 않는다
 site/template.html           사이트 본체. 디자인·로직은 전부 여기서 고친다
 docs/                        GitHub Pages가 서빙하는 폴더 (자동 생성물)
 .github/workflows/           매일 06:00 KST 실행되는 갱신 워크플로
@@ -46,7 +52,8 @@ docs/                        GitHub Pages가 서빙하는 폴더 (자동 생성�
 ## 매일 어떻게 도는가
 
 - 크론은 `0 21 * * *` (UTC) = **매일 06:00 KST**. GitHub 러너가 붐비면 5~40분 늦게 도는 게 정상이다.
-- 워크플로가 Understat에서 6개 시즌-리그(EPL·라리가 × 최근 3시즌)를 받아 `docs/data.json`을 다시 만들고,
+- 워크플로가 FotMob에서 8개 시즌-리그(EPL·라리가 × 최근 4시즌)의 지표 파일과 순위표를 받아
+  `docs/data.json`·`docs/backtest.json`을 다시 만들고,
   내용이 바뀌었을 때만 커밋한다. Pages는 커밋되면 자동 재배포된다.
 - 데이터가 비정상적으로 적게 잡히면(팀 30개 미만, 선수 200명 미만) 커밋을 막고 워크플로가 실패한다.
   → 이전 데이터가 그대로 살아 있으니 사이트는 안 깨진다.
@@ -62,8 +69,9 @@ docs/                        GitHub Pages가 서빙하는 폴더 (자동 생성�
 ## 로컬에서 돌리기
 
 ```bash
-python scripts/fetch_understat.py   # data/understat_raw.json 생성
-python scripts/build.py             # docs/ 갱신
+python scripts/fetch_fotmob.py      # data/fotmob_raw.json 생성 (약 1분 30초)
+python scripts/build.py             # docs/data.json, docs/index.html 갱신
+python scripts/backtest.py          # docs/backtest.json 갱신
 python -m http.server -d docs 8000  # http://localhost:8000
 ```
 `file://`로 직접 열면 브라우저 CORS 정책 때문에 `data.json` fetch가 막힌다. 꼭 로컬 서버로 열 것.
@@ -86,18 +94,25 @@ claude
 
 | 지표 | 뜻 |
 |---|---|
-| `npxG` | 논페널티 기대득점 — 슛의 위치·상황으로 계산한 "들어갈 법한" 골 수 |
+| `npxG` | 논페널티 기대득점. FotMob에 없어 `xG − 0.79 × PK골`로 근사한다 (실축 PK는 못 뺀다) |
 | `xA` | 기대도움 — 내가 준 패스가 슛으로 이어졌을 때 그 슛의 xG 합 |
-| `xGChain` | 득점으로 이어진 공격 전개에 관여한 총 xG |
-| `xGBuildup` | xGChain에서 본인의 슛·키패스를 뺀 값 = 순수 빌드업 기여 |
-| `PPDA` | 상대 진영 패스 허용량 ÷ 우리 수비 액션 → **작을수록 강한 압박** |
-| `deep` | 골문 20야드 반경 안으로 들어간 패스 수 |
+| 기회 창출 / 빅찬스 창출 | 슛으로 이어진 패스 수 / 결정적 기회를 만든 패스 수 |
+| 성공 패스 / 성공 롱볼 | 90분당 성공 횟수 |
+| 태클 / 인터셉트 / 리커버리 / 클리어 / 블록 | 수비 액션 90분당 (합계에서 계산) |
+| 박스 침투 (팀) | 상대 페널티 박스 안 터치 수 / 경기 |
+| 전방 압박 (팀) | 상대 파이널 서드에서 공을 뺏은 횟수 / 경기 |
+| 수비 활동량 (팀) | (태클+인터셉트) / 경기 × 50 / (100 − 점유율) — 공을 덜 가진 팀이 수비 기회가 많은 편향을 보정 |
+
+역할 점수는 출전 시간으로 축소한 지표를 후보 풀 전체 기준 z-점수로 바꿔 가중합하고,
+그 풀 안 백분위 순위(0–100)로 보여준다. 역할 정의와 검증 결과는 `CLAUDE.md`와 사이트 6번 섹션.
 
 ## 한계
 
-Understat은 슛 기반 데이터라 **태클·인터셉트·패스 성공률·볼터치·선수 나이가 없다.**
-그래서 팀 *진단*은 수비까지 다루지만 선수 *추천*은 공격·창조 역할에 한정된다.
-수비수 스카우팅이나 영입 현실성(나이·이적료)까지 하려면 FBref(worldfootballR)나
-StatsBomb open-data, Transfermarkt를 추가로 붙여야 한다.
+- FotMob은 비공식 경로다. 구조가 바뀌면 갱신이 멈춘다 (워크플로가 실패하고 이전 데이터가 남는다).
+- xG 모델이 Understat과 달라 2026년 10월 이전 수치와 직접 비교할 수 없다.
+- 볼터치·선수 나이·이적료가 없어 영입 현실성(나이·계약·시장가)은 판단하지 않는다.
+  필요하면 Transfermarkt 같은 소스를 추가로 붙여야 한다.
+- 출전 경기가 팀 경기의 절반에 못 미친 선수는 FotMob이 90분당 지표를 주지 않아 순위에서 빠진다.
+- 경기별 xG 추이는 없다.
 
-데이터 출처: [Understat](https://understat.com)
+데이터 출처: [FotMob](https://www.fotmob.com) (2026년 10월까지는 [Understat](https://understat.com))
