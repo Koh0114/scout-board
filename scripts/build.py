@@ -86,6 +86,9 @@ def team_block(lg, yr):
         p = poss[tid]["StatValue"]
         out[t["name"]] = dict(
             id=tid, name=t["name"], league=lg, mp=n,
+            rank=t.get("rank"),
+            # FotMob TeamColor — 결론 스트립의 띠에만 쓴다 (글자·데이터 마크엔 쓰지 않는다)
+            color=X.get("TeamColor"),
             w=t["wins"], d=t["draws"], l=t["losses"], pts=t["pts"],
             gf=gf, ga=ga, gf90=gf / n, ga90=ga / n,
             xG=X["StatValue"], xGA=XA["StatValue"],
@@ -220,7 +223,7 @@ with open(os.path.join(DOCS, "data.json"), "w", encoding="utf-8") as fp:
     json.dump(out, fp, ensure_ascii=False, separators=(",", ":"))
 
 tpl = open(TEMPLATE, encoding="utf-8").read().replace("/*__DATA__*/", "")
-SPLIT = "<header class=\"mast\">"
+SPLIT = "<!--BODY-->"                  # template.html에서 이 표지 앞은 <head>, 뒤는 <body>
 i = tpl.index(SPLIT)
 head_part, body_part = tpl[:i], tpl[i:]
 html = ('<!doctype html>\n<html lang="ko">\n<head>\n<meta charset="utf-8">\n'

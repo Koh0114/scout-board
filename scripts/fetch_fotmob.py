@@ -128,7 +128,7 @@ def league_page(lid, season=None):
             cancelled=bool(st.get("cancelled")), score=st.get("scoreStr")))
     return d, dict(
         season=sel,
-        table=[{k: r.get(k) for k in TABLE_KEYS} for r in table],
+        table=[dict({k: r.get(k) for k in TABLE_KEYS}, rank=i + 1) for i, r in enumerate(table)],  # table.all은 순위 순
         xg_table=[{k: r.get(k) for k in XG_KEYS + ("xPoints",)} for r in xg],
         matches=matches)
 
@@ -139,8 +139,9 @@ def stat_file(lid, sid, name, team):
     tl = need(d, ["TopLists", 0], url)
     rows = need(tl, ["StatList"], url)
     check_rows(rows, TEAM_KEYS if team else PLAYER_KEYS, url)
-    for r in rows:
-        r.pop("TeamColor", None)
+    if not team:                      # 팀색은 팀 파일에만 남긴다 (결론 스트립의 띠). 선수 행에선 용량만 늘린다
+        for r in rows:
+            r.pop("TeamColor", None)
     return dict(title=tl.get("Title"), subtitle=tl.get("Subtitle"), rows=rows)
 
 
