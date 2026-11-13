@@ -182,7 +182,8 @@ def slim(p):
         o[k] = rnd(p[k], 2 if k == "rating" else 3)  # 표시 전용, 없으면 null
     o["pc"] = {k: p["pct"][k] for k in PLAYER_METRICS}
     o["pa"] = {k: p["pctA"][k] for k in PLAYER_METRICS}
-    o["r"] = p["role"]
+    o["r"] = p["role"]                                            # z 합성값의 풀 안 백분위 순위
+    o["rz"] = {k: round(v, 3) for k, v in p["role_z"].items()}    # z 합성값 원본
     fp = form_players.get((p["league"], p["id"]))
     if fp and fp["mins"] >= 90 and FORM != SEASON:
         o["now"] = dict(m=fp["mins"], g=fp["g"], a=fp["a"],
@@ -199,6 +200,7 @@ out = dict(
               # pc(그룹 백분위)와 축소 사전평균은 peer_groups 기준. 합쳤으면 groups_merged에 기록
               peer_groups=counts, min_group=MIN_GROUP, groups_merged=MERGES,
               pool_rule=f"{POOL_MIN}분 이상 + 팀 경기 절반 이상 출전",
+              role_score="축소값의 풀 전체 z-점수 가중합(rz) → 풀 안 백분위 순위(r)",
               npxg_note=f"npxG = xG − {PK_XG} × PK골 (근사, 실축 PK는 빼지 못함)",
               shrink=dict(k=K_INFO, prior={g: {m: round(v, 3) for m, v in pr.items()}
                                            for g, pr in PRIOR.items()})),
@@ -210,6 +212,7 @@ out = dict(
               for p in sorted(excluded, key=lambda p: -p["mins"])],
     roles={k: v["label"] for k, v in ROLES.items()},
     role_groups={k: v["groups"] for k, v in ROLES.items()},
+    role_weights={k: v["w"] for k, v in ROLES.items()},
 )
 
 os.makedirs(DOCS, exist_ok=True)

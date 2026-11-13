@@ -28,9 +28,12 @@ K_MIN_MINS = 600          # 두 시즌 모두 이만큼 뛴 선수만 상관계�
 # 출발점 가중치 (FOTMOB_MIGRATION.md 3절). groups = 이 역할을 추천할 포지션 그룹.
 # 빌드업은 lbp_total을 뺐다: EPL 23/24·24/25, 라리가 23/24에 파일이 없어서
 # 넣으면 시즌마다 역할 정의가 달라지고 백테스트가 성립하지 않는다.
+# 결정력은 npxG/90 하나다: 슈팅·드리블을 섞은 가중합이 '지난 시즌 npxG/90 그대로'보다
+# 두 시즌쌍 모두 낮았다(921daf3). 가중치는 백테스트로 고르지 않는다 — 시즌쌍 2개로
+# 고르고 같은 2개로 검증하면 과적합이다.
 ROLES = {
     "finisher":   {"label": "골 결정력 (Finisher)",   "groups": ["ST", "AM"],
-                   "w": {"npxG90": .55, "sh90": .25, "drib90": .20}},
+                   "w": {"npxG90": 1.0}},
     "creator":    {"label": "찬스 메이킹 (Creator)",  "groups": ["AM", "CM", "FB"],
                    "w": {"xA90": .50, "chances90": .30, "bigch90": .20}},
     "progressor": {"label": "빌드업 (Progressor)",    "groups": ["CM", "CB"],
@@ -396,8 +399,10 @@ def apply_shrinkage(pool, K, prior):
 
 def score_pool(pool, suffix="_adj"):
     """그룹 백분위(pct) · 풀 전체 백분위(pctA) · 역할 점수를 매긴다.
-    role   = 풀 전체 백분위의 가중합 (배포 모델)
-    role_z = 풀 전체 z-점수의 가중합 (백테스트 비교용)
+    role_z    = 풀 전체 z-점수의 가중합 (배포 모델의 점수)
+    role      = role_z의 풀 안 백분위 순위 0–100 (사이트 표시용, 순위는 role_z와 같다)
+    role_pctw = 풀 전체 백분위의 가중합 (이전 모델, 백테스트 비교용)
+    백분위 가중합은 두 시즌쌍 모두 z-점수보다 예측력이 낮았다(921daf3).
     suffix='_adj'면 축소값, ''이면 원값 기준 — 백테스트 비교군에 쓴다."""
     for lab in peer_labels(pool):
         grp = [p for p in pool if p["peer"] == lab]
@@ -414,10 +419,14 @@ def score_pool(pool, suffix="_adj"):
         for x in pool:
             x.setdefault("pctA", {})[m] = round(pct_rank(vals, x[m + suffix]), 1)
     for p in pool:
-        p["role"] = {k: round(sum(p["pctA"][m] * w for m, w in r["w"].items()), 1)
-                     for k, r in ROLES.items()}
+        p["role_pctw"] = {k: round(sum(p["pctA"][m] * w for m, w in r["w"].items()), 1)
+                          for k, r in ROLES.items()}
         p["role_z"] = {k: sum((p[m + suffix] - zs[m][0]) / zs[m][1] * w for m, w in r["w"].items())
                        for k, r in ROLES.items()}
+    for k in ROLES:
+        vals = [p["role_z"][k] for p in pool]
+        for p in pool:
+            p.setdefault("role", {})[k] = round(pct_rank(vals, p["role_z"][k]), 1)
     return pool
 
 
