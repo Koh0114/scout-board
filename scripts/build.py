@@ -1,28 +1,29 @@
-"""data/understat_raw.json  ->  docs/data.json + docs/index.html
+"""data/fotmob_raw.json  ->  docs/data.json + docs/index.html
 
 기준 시즌은 자동으로 정한다:
   현재 시즌이 15경기 이상 치렀으면 현재 시즌, 아니면 직전 시즌.
   (9월에는 직전 시즌이 기준, 12월쯤 자동으로 현재 시즌으로 넘어간다.)
-표준 라이브러리만 사용한다.
+표준 라이브러리만 사용한다. 지표 규약은 FOTMOB_MIGRATION.md 1·4절.
 """
 import json, os, sys
-from datetime import date, timezone, datetime, timedelta
+from datetime import timezone, datetime, timedelta
 
-from model import (LEAGUES, POOL_MIN, PLAYER_METRICS, ROLES, POSNAME, POS_GROUPS,
-                   f, season_label, pct_rank, primary_pos,
+from model import (LEAGUES, POOL_MIN, PLAYER_METRICS, DISPLAY_METRICS, ROLES, POS_GROUPS,
+                   PK_XG, season_label, pct_rank, played, season_block,
                    player_rows, estimate_k, prior_means, apply_shrinkage, score_pool)
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-RAW = os.path.join(ROOT, "data", "understat_raw.json")
+RAW = os.path.join(ROOT, "data", "fotmob_raw.json")
 DOCS = os.path.join(ROOT, "docs")
 TEMPLATE = os.path.join(ROOT, "site", "template.html")
 
 SWITCH_AFTER = 15         # 현재 시즌이 이만큼 치르면 기준 시즌을 넘긴다
 
-TEAM_METRICS = [("npxG90", True), ("npxGA90", False), ("npxGD90", True),
-                ("deep90", True), ("deep_allowed90", False),
-                ("ppda", False), ("ppda_allowed", True),
-                ("finishing", True), ("keeping", True)]
+# (키, 높을수록 좋은가). False면 백분위가 100 - p로 뒤집힌다.
+TEAM_METRICS = [("xG90", True), ("xGA90", False), ("xGD90", True),
+                ("finishing", True), ("keeping", True),
+                ("box90", True), ("press90", True), ("poss", True),
+                ("defact_adj", True)]
 
 
 # --------------------------------------------------------------- load
@@ -32,18 +33,9 @@ if not years:
     sys.exit("원본에 시즌이 없습니다.")
 CUR = years[-1]
 
-
-def matches_played(yr):
-    n = 0
-    for lg in LEAGUES:
-        t = d.get(f"{lg}_{yr}", {}).get("teams") or {}
-        n = max(n, max((len(v.get("history", [])) for v in t.values()), default=0))
-    return n
-
-
-SEASON = CUR if matches_played(CUR) >= SWITCH_AFTER else CUR - 1
+SEASON = CUR if played(d, CUR) >= SWITCH_AFTER else CUR - 1
 FORM = CUR
-print(f"기준 시즌 {season_label(SEASON)} ({matches_played(SEASON)}경기) · 최근 폼 {season_label(FORM)} ({matches_played(FORM)}경기)")
+print(f"기준 시즌 {season_label(SEASON)} ({played(d, SEASON)}경기) · 최근 폼 {season_label(FORM)} ({played(d, FORM)}경기)")
 if f"{list(LEAGUES)[0]}_{SEASON}" not in d:
     sys.exit(f"기준 시즌 {SEASON} 데이터가 원본에 없습니다.")
 
@@ -53,34 +45,61 @@ K_VALUES, K_INFO = estimate_k(d, years, log=print)
 
 # --------------------------------------------------------------- teams
 def team_block(lg, yr):
+    blk = season_block(d, lg, yr)
+    st = blk.get("stats") or {}
+    table = blk.get("table") or []
+    if not table:
+        return {}
+
+    def by_team(name):
+        rows = {r["TeamId"]: r for r in st[name]["rows"]}
+        miss = [t["name"] for t in table if t["id"] not in rows]
+        if miss:
+            sys.exit(f"{lg}_{yr} {name}: 순위표 팀 {miss}이 지표 파일에 없다")
+        return rows
+
+    xg, xga = by_team("expected_goals_team"), by_team("expected_goals_conceded_team")
+    box, press = by_team("touches_in_opp_box_team"), by_team("poss_won_att_3rd_team")
+    poss = by_team("possession_percentage_team")
+    tkl, intc = by_team("total_tackle_team"), by_team("interception_team")
+
+    # 최근 6경기 — 끝난 경기만, 시간순
+    results = {}
+    for m in sorted(blk.get("matches") or [], key=lambda m: m["utc"] or ""):
+        if not m["finished"] or m["cancelled"] or not m["score"]:
+            continue
+        hs, as_ = (int(x) for x in m["score"].split(" - "))
+        for tid, gf, ga in ((m["home"], hs, as_), (m["away"], as_, hs)):
+            results.setdefault(tid, []).append("w" if gf > ga else "d" if gf == ga else "l")
+
     out = {}
-    for tid, t in (d.get(f"{lg}_{yr}", {}).get("teams") or {}).items():
-        h = t.get("history") or []
-        n = len(h)
+    for t in table:
+        tid, n = t["id"], t["played"]
         if n == 0:
             continue
-        a = dict(xG=0, xGA=0, npxG=0, npxGA=0, deep=0, deep_allowed=0, scored=0,
-                 missed=0, pts=0, xpts=0, pa=0, pd=0, aa=0, ad=0)
-        for m in h:
-            a["xG"] += m["xG"]; a["xGA"] += m["xGA"]
-            a["npxG"] += m["npxG"]; a["npxGA"] += m["npxGA"]
-            a["deep"] += m["deep"]; a["deep_allowed"] += m["deep_allowed"]
-            a["scored"] += m["scored"]; a["missed"] += m["missed"]
-            a["pts"] += m["pts"]; a["xpts"] += m["xpts"]
-            a["pa"] += m["ppda"]["att"]; a["pd"] += m["ppda"]["def"]
-            a["aa"] += m["ppda_allowed"]["att"]; a["ad"] += m["ppda_allowed"]["def"]
-        out[t["title"]] = dict(
-            id=tid, name=t["title"], league=lg, mp=n,
-            npxG90=a["npxG"] / n, npxGA90=a["npxGA"] / n,
-            npxGD90=(a["npxG"] - a["npxGA"]) / n,
-            gf90=a["scored"] / n, ga90=a["missed"] / n, gf=a["scored"], ga=a["missed"],
-            deep90=a["deep"] / n, deep_allowed90=a["deep_allowed"] / n,
-            ppda=a["pa"] / max(a["pd"], 1), ppda_allowed=a["aa"] / max(a["ad"], 1),
-            pts=a["pts"], xpts=round(a["xpts"], 1),
-            finishing=a["scored"] - a["xG"], keeping=a["xGA"] - a["missed"],
-            form=[m["result"] for m in h[-6:]],
-            xg_series=[round(m["npxG"], 2) for m in h],
-            xga_series=[round(m["npxGA"], 2) for m in h],
+        gf, ga = (int(x) for x in t["scoresStr"].split("-"))
+        X, XA = xg[tid], xga[tid]
+        nx, nxa = X["MatchesPlayed"] or n, XA["MatchesPlayed"] or n
+        defact = ((tkl[tid]["SubStatValue"] + intc[tid]["SubStatValue"])
+                  / (tkl[tid]["MatchesPlayed"] or n))
+        p = poss[tid]["StatValue"]
+        out[t["name"]] = dict(
+            id=tid, name=t["name"], league=lg, mp=n,
+            w=t["wins"], d=t["draws"], l=t["losses"], pts=t["pts"],
+            gf=gf, ga=ga, gf90=gf / n, ga90=ga / n,
+            xG=X["StatValue"], xGA=XA["StatValue"],
+            xG90=X["StatValue"] / nx, xGA90=XA["StatValue"] / nxa,
+            xGD90=X["StatValue"] / nx - XA["StatValue"] / nxa,
+            # 득점 − xG, 피xG − 실점: 같은 파일의 StatValue/SubStatValue끼리 뺀다
+            finishing=X["SubStatValue"] - X["StatValue"],
+            keeping=XA["StatValue"] - XA["SubStatValue"],
+            box90=box[tid]["StatValue"] / (box[tid]["MatchesPlayed"] or n),
+            press90=press[tid]["StatValue"],
+            poss=p,
+            defact90=defact,
+            # 점유율 보정: 상대가 공을 50% 가진 것으로 환산 (FOTMOB_MIGRATION.md 3절)
+            defact_adj=defact * 50 / (100 - p),
+            form=results.get(tid, [])[-6:],
         )
     return out
 
@@ -90,8 +109,9 @@ players = player_rows(d, SEASON)
 
 form_teams = {}
 for lg in LEAGUES:
-    form_teams.update(team_block(lg, FORM))
-form_players = {(r["league"], r["name"]): r for r in player_rows(d, FORM)}
+    for t in team_block(lg, FORM).values():
+        form_teams[(lg, t["id"])] = t
+form_players = {(r["league"], r["id"]): r for r in player_rows(d, FORM)}
 
 for lg, tt in teams.items():
     for m, higher in TEAM_METRICS:
@@ -101,6 +121,9 @@ for lg, tt in teams.items():
             t.setdefault("pct", {})[m] = round(p if higher else 100 - p, 1)
 
 pool = [p for p in players if p["mins"] >= POOL_MIN and p["pos"] in POS_GROUPS]
+bad = [(p["name"], m) for p in pool for m in PLAYER_METRICS if p[m] is None]
+if bad:
+    sys.exit(f"후보 풀에 결측 지표: {bad[:10]}")
 
 # per-90 계산 직후 · 백분위 계산 전에 축소를 적용한다.
 # 백분위(pct/pctA)와 역할 점수는 전부 축소값 기준, 원값은 표시용으로 남는다.
@@ -110,9 +133,9 @@ score_pool(pool, suffix="_adj")
 
 for lg, tt in teams.items():
     for name, t in tt.items():
-        squad = [p for p in players if p["team"] == name and p["league"] == lg]
+        squad = [p for p in players if p["team_id"] == t["id"] and p["league"] == lg]
         t["squad_n"] = len(squad)
-        for posg in ("FW", "MF", "DF"):
+        for posg in POS_GROUPS:
             grp = [p for p in squad if p["pos"] == posg]
             mins = sum(p["mins"] for p in grp) or 1
             t.setdefault("by_pos", {})[posg] = dict(
@@ -122,28 +145,35 @@ for lg, tt in teams.items():
         top = sorted(squad, key=lambda p: -(p["npxG"] + p["xA"]))[:6]
         t["top"] = [dict(name=p["name"], pos=p["pos"], mins=p["mins"], g=p["g"], a=p["a"],
                          npxG90=round(p["npxG90"], 2), xA90=round(p["xA90"], 2)) for p in top]
-        fn = form_teams.get(name)
-        t["form_now"] = (dict(mp=fn["mp"], npxGD90=round(fn["npxGD90"], 2), pts=fn["pts"])
+        fn = form_teams.get((lg, t["id"]))
+        t["form_now"] = (dict(mp=fn["mp"], xGD90=round(fn["xGD90"], 2), pts=fn["pts"])
                          if fn and FORM != SEASON else None)
 
 for lg, tt in teams.items():
-    for posg in ("FW", "MF", "DF"):
+    for posg in POS_GROUPS:
         for m in ("npxG90", "xA90"):
             vals = [t["by_pos"][posg][m] for t in tt.values()]
             for t in tt.values():
                 t["by_pos"][posg].setdefault("pct", {})[m] = round(pct_rank(vals, t["by_pos"][posg][m]), 1)
 
 
+def rnd(x, k=3):
+    return None if x is None else round(x, k)
+
+
 def slim(p):
-    o = dict(n=p["name"], t=p["team"], l=p["league"], p=p["pos"], m=p["mins"],
-             gm=p["games"], g=p["g"], a=p["a"], fin=round(p["fin"], 2))
+    o = dict(id=p["id"], n=p["name"], t=p["team"], l=p["league"], p=p["pos"],
+             pc_codes=p["pos_codes"], m=p["mins"], gm=p["games"], g=p["g"], pk=p["pkg"],
+             a=p["a"], xG=rnd(p["xG"], 2), fin=round(p["fin"], 2))
     for k in PLAYER_METRICS:
         o[k] = round(p[k], 3)                       # 원값 — 표에 표시
         o[k + "_adj"] = round(p[k + "_adj"], 3)     # 축소값 — 백분위·역할 점수 계산에 쓴 값
+    for k in DISPLAY_METRICS:
+        o[k] = rnd(p[k], 2 if k == "rating" else 3)  # 표시 전용, 없으면 null
     o["pc"] = {k: p["pct"][k] for k in PLAYER_METRICS}
     o["pa"] = {k: p["pctA"][k] for k in PLAYER_METRICS}
     o["r"] = p["role"]
-    fp = form_players.get((p["league"], p["name"]))
+    fp = form_players.get((p["league"], p["id"]))
     if fp and fp["mins"] >= 90 and FORM != SEASON:
         o["now"] = dict(m=fp["mins"], g=fp["g"], a=fp["a"],
                         npxG90=round(fp["npxG90"], 2), xA90=round(fp["xA90"], 2))
@@ -152,14 +182,17 @@ def slim(p):
 
 KST = timezone(timedelta(hours=9))
 out = dict(
-    meta=dict(source="Understat", season=season_label(SEASON),
+    meta=dict(source="FotMob", season=season_label(SEASON),
               form_season=season_label(FORM), leagues=LEAGUES, pool_min=POOL_MIN,
               generated=datetime.now(KST).strftime("%Y-%m-%d %H:%M KST"),
+              pos_groups=list(POS_GROUPS),
+              npxg_note=f"npxG = xG − {PK_XG} × PK골 (근사, 실축 PK는 빼지 못함)",
               shrink=dict(k=K_INFO, prior={g: {m: round(v, 3) for m, v in pr.items()}
                                            for g, pr in PRIOR.items()})),
     teams={lg: list(tt.values()) for lg, tt in teams.items()},
     players=[slim(p) for p in pool],
     roles={k: v["label"] for k, v in ROLES.items()},
+    role_groups={k: v["groups"] for k, v in ROLES.items()},
 )
 
 os.makedirs(DOCS, exist_ok=True)
