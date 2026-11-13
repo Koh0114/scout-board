@@ -1,349 +1,459 @@
 <title>Scout Board</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
+/* =========================================================================
+   토큰 — 다크가 기본. 라이트는 미디어쿼리와 [data-theme="light"] 양쪽에서 재정의한다.
+   모든 색은 :root에 먼저 정의돼 있어야 한다 (미디어쿼리 안에만 있는 색 금지).
+   글자 크기는 12 / 13 / 15 / 18 / 24 / 32 여섯 단계만 쓴다.
+   ========================================================================= */
 :root{
-  color-scheme: light;
-  --bg:#F6F7F4; --surface:#FFFFFF; --surface-2:#EFF1EC; --surface-3:#E6E9E3;
-  --ink:#101512; --ink-2:#4E574F; --ink-3:#7C857D;
-  --line:#DBE0D8; --line-2:#C7CEC4;
-  --accent:#256abf; --accent-2:#1c5cab; --on-accent:#ffffff;
-  --pos:#2a78d6; --neg:#e34948; --mid:#DFE2DC;
-  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a;
-  --warn:#B26A05;
-  --shadow: 0 1px 2px rgba(16,21,18,.06), 0 8px 24px rgba(16,21,18,.05);
+  color-scheme: dark;
+  --bg:#0E1116; --surface:#151A21; --surface-2:#1C232C; --line:#26303B;
+  --ink:#E6EBF0; --ink-2:#9AA6B2; --ink-3:#6B7785;
+  --accent:#3987e5; --on-accent:#0B1320;
+  --pos:#3987e5; --neg:#e66767; --mid:#4A5563;
+  --track:#232C37; --team:#26303B;
+  --squad:#d95926;   /* 산점도의 현 스쿼드 점에만 쓴다 */
+  --shadow:0 8px 24px rgba(0,0,0,.45);
+  --f-body:"Pretendard Variable","Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --f-num:"IBM Plex Mono",ui-monospace,"SFMono-Regular",monospace;
+  --topbar-h:56px;
 }
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){
-    color-scheme: dark;
-    --bg:#0F120F; --surface:#181C18; --surface-2:#20251F; --surface-3:#2A302A;
-    --ink:#F1F4EF; --ink-2:#B2B9B1; --ink-3:#848C83;
-    --line:#2B312A; --line-2:#3A413A;
-    --accent:#3987e5; --accent-2:#5598e7; --on-accent:#08111c;
-    --pos:#3987e5; --neg:#e66767; --mid:#343A33;
-    --s1:#3987e5; --s2:#d95926; --s3:#199e70;
-    --warn:#C98500;
-    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 28px rgba(0,0,0,.35);
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    color-scheme: light;
+    --bg:#F6F7F4; --surface:#FFFFFF; --surface-2:#EEF0EB; --line:#DBE0D8;
+    --ink:#101512; --ink-2:#4E574F; --ink-3:#7C857D;
+    --accent:#2a78d6; --on-accent:#FFFFFF;
+    --pos:#2a78d6; --neg:#e34948; --mid:#C3C9C0;
+    --track:#E3E6E0; --squad:#eb6834;
+    --shadow:0 8px 24px rgba(16,21,18,.12);
   }
 }
-:root[data-theme="dark"]{
-  color-scheme: dark;
-  --bg:#0F120F; --surface:#181C18; --surface-2:#20251F; --surface-3:#2A302A;
-  --ink:#F1F4EF; --ink-2:#B2B9B1; --ink-3:#848C83;
-  --line:#2B312A; --line-2:#3A413A;
-  --accent:#3987e5; --accent-2:#5598e7; --on-accent:#08111c;
-  --pos:#3987e5; --neg:#e66767; --mid:#343A33;
-  --s1:#3987e5; --s2:#d95926; --s3:#199e70;
-  --warn:#C98500;
-  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 28px rgba(0,0,0,.35);
+:root[data-theme="light"]{
+  color-scheme: light;
+  --bg:#F6F7F4; --surface:#FFFFFF; --surface-2:#EEF0EB; --line:#DBE0D8;
+  --ink:#101512; --ink-2:#4E574F; --ink-3:#7C857D;
+  --accent:#2a78d6; --on-accent:#FFFFFF;
+  --pos:#2a78d6; --neg:#e34948; --mid:#C3C9C0;
+  --track:#E3E6E0; --squad:#eb6834;
+  --shadow:0 8px 24px rgba(16,21,18,.12);
 }
 
 *{box-sizing:border-box}
-body{
-  margin:0; background:var(--bg); color:var(--ink);
-  font-family:"IBM Plex Sans","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
-  font-size:15px; line-height:1.55; -webkit-font-smoothing:antialiased;
-}
-.wrap{max-width:1180px;margin:0 auto;padding:0 24px}
-h1,h2,h3{font-family:Archivo,"IBM Plex Sans",system-ui,sans-serif;margin:0;text-wrap:balance;letter-spacing:-.015em}
-.num{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
-.eyebrow{font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-3);font-weight:600}
+html{background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55;
+  -webkit-font-smoothing:antialiased;font-feature-settings:"tnum" 0}
+h1,h2,h3,h4{margin:0;font-weight:700;letter-spacing:-.01em;text-wrap:balance}
+.num{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+.wrap{max-width:1200px;margin:0 auto;padding-inline:24px}
+.sub{font-size:12px;color:var(--ink-3)}
+.eyebrow{font-size:12px;color:var(--ink-3);font-weight:600;letter-spacing:.04em}
+button,select,input{font:inherit;color:inherit}
+button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible,[tabindex]:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+a{color:var(--accent)}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
 
-/* ---------- masthead ---------- */
-.mast{border-bottom:1px solid var(--line);background:var(--surface);position:relative;overflow:hidden}
-.mast::after{
-  content:"";position:absolute;inset:0;pointer-events:none;
-  background:repeating-linear-gradient(90deg,transparent 0 78px,color-mix(in srgb,var(--ink) 4%,transparent) 78px 79px);
-  mask-image:linear-gradient(180deg,transparent,#000 70%);
-}
-.mast-in{position:relative;z-index:1;display:flex;flex-wrap:wrap;gap:18px 32px;align-items:flex-end;justify-content:space-between;padding-block:26px 22px}
-.mast h1{font-size:clamp(28px,4.2vw,42px);line-height:1.02;font-weight:700}
-.mast h1 span{display:block;font-size:.42em;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:8px}
-.mast p{margin:8px 0 0;color:var(--ink-2);font-size:13.5px;max-width:52ch}
-.srcline{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink-3)}
-.srcline b{color:var(--ink-2);font-weight:600}
+/* ---------- 상단 바 (고정) ---------- */
+.topbar{position:sticky;top:0;z-index:30;background:var(--surface)}
+.topbar-in{display:flex;align-items:center;gap:10px 16px;min-height:var(--topbar-h);flex-wrap:wrap;padding-block:8px}
+.brand{font-weight:800;font-size:15px;letter-spacing:-.01em;margin-right:8px;white-space:nowrap}
+.brand i{font-style:normal;color:var(--accent)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--surface-2)}
+.seg button{appearance:none;border:0;background:transparent;color:var(--ink-2);font-size:13px;font-weight:600;padding:6px 12px;cursor:pointer;white-space:nowrap}
+.seg button[aria-pressed="true"],.seg button[aria-selected="true"]{background:var(--accent);color:var(--on-accent)}
+select{font-size:13px;font-weight:600;background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:6px 10px;color:var(--ink)}
+#teamSel{min-width:220px}
+.upd{margin-left:auto;font-size:12px;color:var(--ink-3);white-space:nowrap}
 
-/* ---------- controls ---------- */
-.controls{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
-.controls-in{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;padding-block:12px}
-.seg{display:inline-flex;border:1px solid var(--line-2);border-radius:7px;overflow:hidden}
-.seg button{appearance:none;border:0;background:var(--surface);color:var(--ink-2);font:inherit;font-size:13px;font-weight:500;padding:6px 14px;cursor:pointer}
-.seg button+button{border-left:1px solid var(--line-2)}
-.seg button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent)}
-select{font:inherit;font-size:14px;font-weight:500;color:var(--ink);background:var(--surface);border:1px solid var(--line-2);border-radius:7px;padding:6px 10px;min-width:190px}
-label.fld{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-3)}
-input[type=range]{accent-color:var(--accent);width:140px}
-button:focus-visible,select:focus-visible,input:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* ---------- 결론 스트립 ---------- */
+.strip{position:relative;margin-top:20px;border:1px solid var(--line);border-radius:6px;background:var(--surface);
+  padding:16px 20px 16px 24px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px 24px;align-items:start}
+.strip::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:6px 0 0 6px;background:var(--team)}
+.strip h1{font-size:24px;line-height:1.2}
+.kpis{display:flex;gap:24px;margin:0;flex-wrap:wrap}
+.kpis div{min-width:0}
+.kpis dt{font-size:12px;color:var(--ink-3)}
+.kpis dd{margin:0;font-family:var(--f-num);font-variant-numeric:tabular-nums;font-size:24px;font-weight:600;line-height:1.2;white-space:nowrap}
+.kpis dd small{font-size:12px;font-weight:400;color:var(--ink-3);margin-left:4px;font-family:var(--f-body)}
+.need{grid-column:1/-1;margin:0;font-size:15px;color:var(--ink-2)}
+.need b{color:var(--ink)}
+.top3{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.top3 .lbl{font-size:12px;color:var(--ink-3);margin-right:4px}
+.pchip{appearance:none;border:0;background:var(--surface-2);border-radius:6px;padding:6px 10px;cursor:pointer;display:inline-flex;gap:8px;align-items:baseline;font-size:13px;color:var(--ink)}
+.pchip:hover{background:var(--line)}
+.pchip .rk{font-family:var(--f-num);color:var(--ink-3);font-size:12px}
+.pchip .tm{color:var(--ink-3);font-size:12px}
+.pchip .sc{font-family:var(--f-num);color:var(--accent);font-weight:600;font-size:12px}
 
-/* ---------- layout ---------- */
-section{padding:34px 0;border-bottom:1px solid var(--line)}
-section:last-of-type{border-bottom:0}
-.sec-head{display:flex;align-items:baseline;gap:14px;margin-bottom:18px;flex-wrap:wrap}
-.sec-head h2{font-size:19px;font-weight:700}
-.sec-head .hint{font-size:12.5px;color:var(--ink-3)}
+/* ---------- 탭 ---------- */
+.tabs{display:flex;gap:24px;margin-top:20px;border-bottom:1px solid var(--line)}
+.tabs button{appearance:none;border:0;background:none;padding:10px 0;font-size:15px;font-weight:600;color:var(--ink-3);cursor:pointer;position:relative}
+.tabs button[aria-selected="true"]{color:var(--ink)}
+.tabs button[aria-selected="true"]::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--accent)}
+.panel{padding:20px 0 40px}
 
-.grid2{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:22px}
-.grid2.even{grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start}
-.grid2.cand{grid-template-columns:minmax(0,1fr) minmax(0,360px);align-items:start}
-/* .grid2.even/.grid2.cand(클래스 2개)가 .grid2보다 우선하므로 셋 다 명시해야 한 칸으로 접힌다 */
-@media(max-width:820px){.grid2,.grid2.even,.grid2.cand{grid-template-columns:minmax(0,1fr)}}
+/* ---------- 영입 후보: 컨트롤 ---------- */
+.ctl{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center;justify-content:space-between}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{appearance:none;border:0;background:var(--surface-2);color:var(--ink-2);border-radius:6px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;gap:8px;align-items:center}
+.chip:hover{color:var(--ink)}
+.chip[aria-pressed="true"]{background:var(--accent);color:var(--on-accent)}
+.chip .rec{font-size:12px;font-weight:600;line-height:16px;padding:0 5px;border-radius:4px;background:var(--surface);color:var(--accent)}
+.chip[aria-pressed="true"] .rec{background:var(--on-accent);color:var(--accent)}
+.filters{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
+.fld{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-3)}
+input[type=range]{accent-color:var(--accent);width:120px}
+input[type=checkbox]{accent-color:var(--accent)}
+.why{margin:12px 0 0;font-size:13px;color:var(--ink-2)}
+.why b{color:var(--ink)}
+.warn{margin:12px 0 0;font-size:13px;color:var(--ink-2);padding:10px 12px;background:var(--surface-2);border-radius:6px}
+.warn b{color:var(--ink)}
 
-.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px}
-.panel-t{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);font-weight:600;margin-bottom:14px}
+.cand{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:24px;margin-top:20px;align-items:start}
+.cand-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.cand-head h2{font-size:18px}
 
-/* team identity */
-.ident h3{font-size:26px;font-weight:700;line-height:1.1}
-.ident .lg{font-size:12px;color:var(--ink-3);letter-spacing:.08em;text-transform:uppercase;font-weight:600}
-.kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-top:16px}
-.kpi{background:var(--surface);padding:11px 13px}
-.kpi dt{font-size:11px;color:var(--ink-3);letter-spacing:.05em;margin:0 0 3px}
-.kpi dd{margin:0;font-size:21px;font-weight:600;font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;line-height:1.1}
-.kpi dd small{font-size:11px;color:var(--ink-3);font-family:"IBM Plex Sans",sans-serif;font-weight:400;margin-left:5px}
-.form-row{display:flex;gap:4px;margin-top:14px;align-items:center}
-.form-row .lbl{font-size:11px;color:var(--ink-3);margin-right:4px}
-.fm{width:19px;height:19px;border-radius:4px;display:grid;place-items:center;font-size:10px;font-weight:700;color:#fff;font-family:"IBM Plex Mono",monospace}
-.fm.w{background:var(--pos)} .fm.d{background:var(--ink-3)} .fm.l{background:var(--neg)}
+/* ---------- 표 ---------- */
+.tbl{border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+table{border-collapse:separate;border-spacing:0;width:100%}
+th,td{text-align:left;font-size:13px;padding:0 10px;height:40px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{position:sticky;top:var(--topbar-h);z-index:2;background:var(--surface-2);font-size:12px;color:var(--ink-3);font-weight:600;white-space:nowrap}
+thead tr:first-child th:first-child{border-top-left-radius:6px}
+thead tr:first-child th:last-child{border-top-right-radius:6px}
+tbody tr:last-child td{border-bottom:0}
+th.n,td.n{text-align:right;font-family:var(--f-num);font-variant-numeric:tabular-nums}
+th.n{font-family:var(--f-body)}
+tbody tr.row{cursor:pointer}
+tbody tr.row:hover td{background:var(--surface-2)}
+tbody tr.row.open td{background:var(--surface-2)}
+td.rk{width:32px;color:var(--ink-3);font-family:var(--f-num)}
+.pn{font-weight:600;line-height:16px}
+.pt{font-size:12px;color:var(--ink-3);line-height:15px;white-space:nowrap}
+.tag{display:inline-block;font-size:12px;padding:1px 6px;border-radius:4px;background:var(--surface-2);color:var(--ink-2);white-space:nowrap}
+tr.open .tag{background:var(--track)}
+.score{display:flex;gap:8px;align-items:center;justify-content:flex-end}
+.score .t{width:56px;height:6px;border-radius:3px;background:var(--track);overflow:hidden}
+.score .t i{display:block;height:100%;background:var(--accent)}
+.score .num{font-size:13px;font-weight:600;min-width:34px;text-align:right}
+tr.det td{height:auto;padding:16px 16px 18px;background:var(--bg)}
+.det-note{margin:12px 0 0;font-size:12px;color:var(--ink-3)}
+.tbl.nopos .c-pos{display:none}
 
-/* percentile ladder */
-.ladder{display:flex;flex-direction:column;gap:9px}
-.lrow{display:grid;grid-template-columns:148px minmax(0,1fr) 44px;gap:11px;align-items:center}
-.lrow .nm{font-size:13px;color:var(--ink-2)}
-.lbar{position:relative;height:16px;background:var(--surface-2);border-radius:3px}
-.lbar .axis{position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:var(--line-2)}
-.lbar .fill{position:absolute;top:2px;bottom:2px;background:var(--pos);border-radius:0 4px 4px 0}
-.lbar .fill.neg{background:var(--neg);border-radius:4px 0 0 4px}
-.lrow .pc{font-size:13px;font-weight:600;text-align:right;font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;color:var(--ink-2)}
-.scale-note{display:flex;justify-content:space-between;font-size:11px;color:var(--ink-3);margin-top:10px;padding-left:159px;padding-right:55px}
+/* 펼친 선수: 숫자 줄 → 막대 묶음 3개 → 백분위 기준 각주 */
+.nrow{display:flex;flex-wrap:wrap;gap:8px 24px;margin:0 0 14px}
+.nrow div{min-width:0}
+.nrow dt{font-size:12px;color:var(--ink-3)}
+.nrow dd{margin:0;font-size:15px;font-weight:600;white-space:nowrap}
+.nrow dd .num{font-weight:600}
+.pgroups{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px 24px;--pb-l:84px}
+.pgroup h4{font-size:12px;font-weight:600;color:var(--ink-3);margin:0 0 4px}
 
-/* findings */
-.findings{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
-.find{border:1px solid var(--line);border-left:3px solid var(--neg);border-radius:8px;padding:13px 15px;background:var(--surface)}
-.find.good{border-left-color:var(--pos)}
-.find h4{margin:0 0 5px;font-size:14.5px;font-weight:600;font-family:"IBM Plex Sans",sans-serif}
-.find p{margin:0;font-size:13px;color:var(--ink-2);line-height:1.5}
-.find .rk{font-family:"IBM Plex Mono",monospace;font-weight:600;color:var(--ink)}
+/* ---------- 백분위 막대 (하나의 컴포넌트) ----------
+   6px 트랙, 50에 눈금, 값은 오른쪽 mono. two=50 기준 양방향(팀), 아니면 0부터(선수). */
+.pbar{display:grid;grid-template-columns:var(--pb-l,112px) minmax(0,1fr) 40px;gap:10px;align-items:center;min-height:26px}
+.pbar .l{font-size:13px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pbar .l small{font-size:12px;color:var(--ink-3);margin-left:6px;font-family:var(--f-num)}
+.pbar.nl{grid-template-columns:minmax(0,1fr) 48px}
+.pbar .t{position:relative;height:6px;background:var(--track);border-radius:3px}
+.pbar .t::after{content:"";position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:var(--ink-3);opacity:.7}
+.pbar .f{position:absolute;top:0;bottom:0;background:var(--pos);border-radius:3px}
+.pbar .f.neg{background:var(--neg)}
+.pbar .v{font-family:var(--f-num);font-variant-numeric:tabular-nums;font-size:13px;text-align:right;color:var(--ink-2)}
 
-/* need chips */
-.chips{display:flex;flex-wrap:wrap;gap:9px}
-.chip{appearance:none;font:inherit;cursor:pointer;background:var(--surface);border:1px solid var(--line-2);color:var(--ink-2);
-  border-radius:999px;padding:7px 16px;font-size:13.5px;font-weight:500;display:inline-flex;align-items:center;gap:8px}
-.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
-.chip .bd{font-size:11px;font-family:"IBM Plex Mono",monospace;opacity:.75}
+/* ---------- 모바일 카드 목록 ---------- */
+.clist{display:none;list-style:none;margin:0;padding:0}
+.card{background:var(--surface);border-radius:6px;padding:12px 14px;margin-bottom:8px;cursor:pointer}
+.card.open{background:var(--surface-2)}
+.card-top{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:4px 10px;align-items:baseline}
+.card-top .rk{font-family:var(--f-num);font-size:13px;color:var(--ink-3)}
+.card-top .sc{font-family:var(--f-num);font-size:18px;font-weight:600}
+.card .score{justify-content:flex-start;margin:8px 0 0 34px}
+.card .score .t{flex:1;width:auto}
+.card-kv{display:flex;gap:16px;margin:8px 0 0 34px;font-size:12px;color:var(--ink-3)}
+.card-kv b{font-family:var(--f-num);color:var(--ink);font-weight:600;font-size:13px;margin-left:4px}
+.card-det{margin:12px 0 0 34px}
 
-.note{border:1px dashed var(--line-2);border-radius:8px;padding:12px 15px;font-size:13px;color:var(--ink-2);background:var(--surface-2)}
-.note b{color:var(--ink)}
-
-/* table */
-.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
-table{border-collapse:collapse;width:100%;min-width:660px}
-th,td{text-align:left;padding:9px 10px;font-size:13.5px;border-bottom:1px solid var(--line)}
-th{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);font-weight:600;background:var(--surface-2);position:sticky;top:0;white-space:nowrap}
-tbody tr{cursor:pointer}
-tbody tr:hover{background:var(--surface-2)}
-tbody tr.open{background:var(--surface-2)}
-td.n{text-align:right;font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
-.pname{font-weight:600}
-.psub{font-size:11.5px;color:var(--ink-3);white-space:nowrap}
-.tag{display:inline-block;font-size:10.5px;font-weight:600;letter-spacing:.05em;padding:2px 6px;border-radius:4px;background:var(--surface-3);color:var(--ink-2)}
-.score{display:flex;align-items:center;gap:8px;justify-content:flex-end}
-
-.score .b{width:44px;height:6px;border-radius:3px;background:var(--surface-3);overflow:hidden;flex:none}
-.score .b i{display:block;height:100%;background:var(--accent);border-radius:3px}
-.rank{color:var(--ink-3);font-size:12px;width:22px}
-.detail td{background:var(--bg);padding:16px 18px}
-.pbars{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:9px 22px}
-.pb{display:grid;grid-template-columns:96px 1fr 34px;gap:9px;align-items:center;font-size:12.5px}
-.pb .t{color:var(--ink-3)}
-.pb .track{height:9px;background:var(--surface-3);border-radius:3px;position:relative}
-.pb .track i{position:absolute;left:0;top:0;bottom:0;background:var(--pos);border-radius:3px}
-.pb .track i.low{background:var(--neg)}
-.pb .v{text-align:right;font-family:"IBM Plex Mono",monospace;font-weight:600;color:var(--ink-2)}
-
-/* charts */
-figure{margin:0}
-figcaption{font-size:12px;color:var(--ink-3);margin-top:8px}
-.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--ink-2);margin-bottom:6px}
-.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+/* ---------- 산점도 ---------- */
+.side{background:var(--surface);border-radius:6px;padding:16px}
+.side h3{font-size:13px;color:var(--ink-2);font-weight:600;margin-bottom:8px}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--ink-3);margin-bottom:6px}
+.legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;vertical-align:0}
 svg{display:block;max-width:100%;height:auto}
+.cap{font-size:12px;color:var(--ink-3);margin:8px 0 0}
+
+/* ---------- 제외 목록 ---------- */
+details.excl{margin-top:16px}
+details.excl summary{cursor:pointer;font-size:13px;color:var(--ink-2);padding:8px 0}
+details.excl summary b{color:var(--ink)}
+details.excl p{font-size:13px;color:var(--ink-3);margin:4px 0 12px}
+
+/* ---------- 팀 진단 ---------- */
+.dhead{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.dhead h2{font-size:18px}
+.finds{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.finds li{display:grid;grid-template-columns:44px minmax(0,1fr);gap:12px;align-items:baseline;font-size:15px;color:var(--ink-2)}
+.finds li b{color:var(--ink);font-weight:600}
+.finds .k{font-size:12px;font-weight:600;color:var(--ink-3);display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.finds .k::before{content:"";width:8px;height:8px;border-radius:2px;background:var(--mid)}
+.finds .k.neg::before{background:var(--neg)}
+.finds .k.pos::before{background:var(--pos)}
+.finds .fm{font-size:13px;color:var(--ink-3);white-space:nowrap}
+.diag{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;margin-top:24px;align-items:start}
+.blk{background:var(--surface);border-radius:6px;padding:16px 20px}
+.blk h3{font-size:15px;margin-bottom:4px}
+.blk .sub{display:block;margin-bottom:10px}
+.blk .bars1{--pb-l:236px}
+.blk .bars1 .pbar{min-height:30px}
+.grp-h{font-size:12px;font-weight:600;color:var(--ink-3);margin:10px 0 2px}
+.scale{display:grid;grid-template-columns:var(--pb-l,236px) minmax(0,1fr) 40px;gap:10px;font-size:12px;color:var(--ink-3);margin-top:6px}
+.scale > span:nth-child(2){display:flex;justify-content:space-between}
+.dmeta{display:flex;flex-wrap:wrap;gap:6px 20px;font-size:13px;color:var(--ink-3);margin:16px 0 0}
+.dmeta b{font-family:var(--f-num);font-weight:600;color:var(--ink-2)}
+.fmw{display:inline-flex;gap:3px;vertical-align:1px}
+.fml{font-size:12px;color:var(--ink-3)}
+.fmw span{font-family:var(--f-num);font-size:12px;width:18px;height:18px;line-height:18px;text-align:center;border-radius:4px;background:var(--surface-2);color:var(--ink-2)}
+
+/* ---------- 모델 검증 ---------- */
+.verdicts{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.verdicts li{display:grid;grid-template-columns:120px minmax(0,1fr);gap:12px;font-size:15px;color:var(--ink)}
+.verdicts li b{font-size:13px;font-weight:600;color:var(--ink-2);padding-top:2px}
+.verdicts li.ref{color:var(--ink-2)}
+.bt td.mth{font-size:13px;color:var(--ink-2);height:auto;padding-block:8px}
+.bt td.mth.dep{color:var(--ink);font-weight:600}
+.bt tr.rh td{background:var(--surface-2);font-weight:600;font-size:13px;color:var(--ink)}
+.bt tr.rh td .sub{font-weight:400;margin-left:8px}
+.bt td.cell{width:34%}
+.side-h{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
+.side-h h3{margin:0}
+details.method{margin-top:32px;border-top:1px solid var(--line);padding-top:8px}
+details.method summary{cursor:pointer;font-size:15px;font-weight:600;padding:8px 0}
+details.method p{font-size:13px;color:var(--ink-2);margin:0 0 12px;max-width:80ch}
+details.method p b{color:var(--ink)}
+
 .tip{position:fixed;pointer-events:none;z-index:60;background:var(--ink);color:var(--bg);font-size:12px;line-height:1.45;
-  padding:7px 10px;border-radius:6px;box-shadow:var(--shadow);opacity:0;transition:opacity .1s;max-width:230px}
-.tip b{font-weight:600}
-.tip .num{font-family:"IBM Plex Mono",monospace}
+  padding:6px 10px;border-radius:6px;box-shadow:var(--shadow);opacity:0;transition:opacity .1s;max-width:240px}
+.placeholder{font-size:15px;color:var(--ink-3);padding:40px 0}
 
-footer{padding:28px 0 44px;color:var(--ink-3);font-size:12.5px}
-footer a{color:var(--accent)}
-footer p{margin:0 0 8px;max-width:78ch}
-@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+footer{padding:24px 0 40px;color:var(--ink-3);font-size:12px}
+footer p{margin:0 0 8px;max-width:80ch}
+
+/* ---------- 좁은 화면 ---------- */
+@media (max-width:900px){
+  .cand,.diag{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:640px){
+  .wrap{padding-inline:16px}
+  .topbar-in{gap:8px 10px}
+  .brand{flex:1 1 auto}
+  #teamSel{flex:1 1 100%;min-width:0;order:3}
+  .upd{display:none}
+  .strip{grid-template-columns:minmax(0,1fr);padding:14px 14px 14px 18px}
+  .kpis{gap:16px}
+  .kpis dd{font-size:18px}
+  .tabs{display:flex;gap:0;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--surface-2)}
+  .tabs button{flex:1;padding:8px 0;font-size:13px}
+  .tabs button[aria-selected="true"]{background:var(--accent);color:var(--on-accent)}
+  .tabs button[aria-selected="true"]::after{display:none}
+  .ctl{display:block}
+  .filters{margin-top:12px}
+  .tbl.cands{display:none}
+  .clist{display:block}
+  .pbar{grid-template-columns:minmax(0,1fr) 40px;grid-template-areas:"l v" "t t";row-gap:4px;min-height:0;margin-bottom:6px}
+  .pbar .l{grid-area:l}.pbar .v{grid-area:v}.pbar .t{grid-area:t}
+  .pbar.nl{grid-template-columns:minmax(0,1fr) 44px;grid-template-areas:"t v";margin-bottom:0}
+  .pgroups{grid-template-columns:minmax(0,1fr)}
+  details.excl .tbl{overflow-x:auto}
+  th{position:static}
+  .blk{padding:14px}
+  .scale{grid-template-columns:minmax(0,1fr)}
+  .scale > span:first-child{display:none}
+  .finds li{grid-template-columns:minmax(0,1fr);gap:2px}
+  .finds .fm{white-space:normal}
+  .verdicts li{grid-template-columns:minmax(0,1fr);gap:2px}
+  /* 검증 표: 방법 이름을 한 줄 전체로, 시즌 쌍 두 칸을 그 아래에 */
+  .bt th:first-child{display:none}
+  .bt thead tr,.bt tbody tr:not(.rh){display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .bt th{height:32px;display:flex;align-items:center}
+  .bt td.mth{grid-column:1/-1;border-bottom:0;padding-top:10px;padding-bottom:0}
+  .bt td.cell{width:auto;height:36px}
+  .bt tr.rh td{height:auto;padding-block:10px}
+  .bt tr.rh td .sub{display:block;margin:2px 0 0}
+}
 </style>
-
-<header class="mast">
-  <div class="wrap mast-in">
-    <div>
-      <h1><span>Recruitment Analytics</span>Scout Board</h1>
-      <p>프리미어리그·라리가 40개 팀을 xG·압박·수비 지표로 진단하고, 그 팀에 부족한 역할을 채울 선수를 두 리그 전체에서 찾습니다.</p>
-    </div>
-    <div class="srcline">
-      <span>데이터 <b>FotMob</b></span>
-      <span>기준 시즌 <b id="m-season">–</b></span>
-      <span>최근 폼 <b id="m-form">–</b></span>
-      <span>후보 풀 <b id="m-pool">–</b></span>
-      <span>갱신 <b id="m-upd">–</b></span>
-    </div>
-  </div>
-</header>
-
-<div class="controls">
-  <div class="wrap controls-in">
+<!--BODY-->
+<header class="topbar">
+  <div class="wrap topbar-in">
+    <span class="brand">Scout <i>Board</i></span>
     <div class="seg" role="group" aria-label="리그 선택">
       <button id="lg-EPL" aria-pressed="true">프리미어리그</button>
       <button id="lg-La_liga" aria-pressed="false">라리가</button>
     </div>
     <select id="teamSel" aria-label="팀 선택"></select>
-    <label class="fld">최소 출전 <span class="num" id="minsOut">600</span>분
-      <input type="range" id="minsRange" min="450" max="2400" step="90" value="600">
-    </label>
-    <label class="fld"><input type="checkbox" id="crossOnly"> 상대 리그 선수만</label>
-    <select id="posSel" aria-label="포지션 필터" style="min-width:120px">
-      <option value="ALL">역할 대상 포지션</option>
-      <option value="CB">센터백</option>
-      <option value="FB">풀백·윙백</option>
-      <option value="CM">중앙 미드필더</option>
-      <option value="AM">공격형·측면</option>
-      <option value="ST">스트라이커</option>
-    </select>
+    <span class="upd">갱신 <span class="num" id="m-upd">–</span></span>
   </div>
-</div>
+</header>
 
 <main class="wrap">
+  <div id="boot" class="placeholder">데이터를 불러오는 중…</div>
 
-  <div id="boot" style="padding:40px 0;color:var(--ink-3);font-size:14px">데이터를 불러오는 중…</div>
-
-  <section id="s-diag">
-    <div class="sec-head">
-      <h2>1. 팀 진단</h2>
-      <span class="hint">모든 지표는 같은 리그 20개 팀 안에서의 백분위입니다. 50이 리그 중간값.</span>
+  <section class="strip" id="strip" aria-label="결론" hidden>
+    <div>
+      <div class="eyebrow" id="st-lg">–</div>
+      <h1 id="st-name">–</h1>
     </div>
-    <div class="grid2">
-      <div class="panel ident">
-        <div class="lg" id="t-league">–</div>
-        <h3 id="t-name">–</h3>
-        <dl class="kpis" id="t-kpis"></dl>
-        <div class="form-row" id="t-form"></div>
-        <div style="margin-top:16px" id="t-now"></div>
-      </div>
-      <div class="panel">
-        <div class="panel-t">지표별 리그 백분위</div>
-        <div class="ladder" id="ladder"></div>
-        <div class="scale-note"><span>리그 최하위권</span><span>중간</span><span>리그 최상위권</span></div>
-      </div>
-    </div>
+    <dl class="kpis" id="st-kpi"></dl>
+    <p class="need" id="st-need"></p>
+    <div class="top3" id="st-top"></div>
+  </section>
 
-    <div class="panel" style="margin-top:22px">
-      <div class="panel-t">포지션별 생산량 (팀 내 출전시간 기준 90분당, 리그 20개 팀 안 백분위)</div>
-      <div class="ladder" id="posladder"></div>
+  <nav class="tabs" role="tablist" aria-label="보기 전환">
+    <button role="tab" id="tab-diagnosis" aria-controls="p-diagnosis" data-tab="diagnosis" aria-selected="false" tabindex="-1">팀 진단</button>
+    <button role="tab" id="tab-recruit" aria-controls="p-recruit" data-tab="recruit" aria-selected="true">영입 후보</button>
+    <button role="tab" id="tab-validation" aria-controls="p-validation" data-tab="validation" aria-selected="false" tabindex="-1">모델 검증</button>
+  </nav>
+
+  <!-- ===================== 팀 진단 ===================== -->
+  <section class="panel" id="p-diagnosis" role="tabpanel" aria-labelledby="tab-diagnosis" hidden>
+    <div class="dhead"><h2>무엇이 문제인가</h2><span class="sub" id="dg-hint">–</span></div>
+    <ul class="finds" id="finds"></ul>
+    <div class="dmeta" id="dg-meta"></div>
+
+    <div class="diag">
+      <div class="blk">
+        <h3>팀 지표</h3>
+        <span class="sub" id="tm-sub">–</span>
+        <div class="bars1" id="tmBars"></div>
+        <div class="scale" aria-hidden="true"><span></span><span><span>← 리그 하위</span><span>리그 상위 →</span></span><span></span></div>
+      </div>
+      <div class="blk">
+        <h3>포지션별 생산량</h3>
+        <span class="sub">라인별 선수들의 출전 시간 기준 90분당 값 · 리그 안 백분위</span>
+        <div class="bars1" id="posBars"></div>
+        <div class="scale" aria-hidden="true"><span></span><span><span>← 리그 하위</span><span>리그 상위 →</span></span><span></span></div>
+      </div>
     </div>
   </section>
 
-  <section id="s-find">
-    <div class="sec-head"><h2>2. 무엇이 문제인가</h2>
-      <span class="hint">백분위가 낮은 순으로 약점 3개, 높은 순으로 강점 2개를 자동 추출합니다.</span></div>
-    <div class="findings" id="findings"></div>
-  </section>
-
-  <section id="s-need">
-    <div class="sec-head"><h2>3. 필요한 자원</h2>
-      <span class="hint">약점을 채울 수 있는 역할을 고르면 아래 후보 명단이 바뀝니다.</span></div>
-    <div class="chips" id="needs"></div>
-    <div id="needNote" style="margin-top:14px"></div>
-  </section>
-
-  <section id="s-cand">
-    <div class="sec-head"><h2>4. 후보 선수</h2>
-      <span class="hint" id="candHint">–</span></div>
-    <div class="grid2 cand">
-      <div class="tbl-wrap">
-        <table>
-          <thead><tr>
-            <th style="width:34px"></th><th>선수</th><th>포지션</th>
-            <th class="n" style="text-align:right">출전</th>
-            <th class="n" style="text-align:right">G+A</th>
-            <th class="n" style="text-align:right" id="colA">–</th>
-            <th class="n" style="text-align:right" id="colB">–</th>
-            <th style="text-align:right;min-width:120px">역할 점수</th>
-          </tr></thead>
-          <tbody id="candBody"></tbody>
-        </table>
+  <!-- ===================== 영입 후보 ===================== -->
+  <section class="panel" id="p-recruit" role="tabpanel" aria-labelledby="tab-recruit">
+    <div class="ctl">
+      <div class="chips" id="needs" role="group" aria-label="필요한 역할"></div>
+      <div class="filters">
+        <label class="fld">포지션
+          <select id="posSel">
+            <option value="ALL">역할 대상 전체</option>
+            <option value="CB">센터백</option>
+            <option value="FB">풀백·윙백</option>
+            <option value="CM">중앙 미드필더</option>
+            <option value="AM">공격형·측면</option>
+            <option value="ST">스트라이커</option>
+          </select>
+        </label>
+        <label class="fld">최소 출전 <span class="num" id="minsOut">600</span>분
+          <input type="range" id="minsRange" min="600" max="2400" step="90" value="600">
+        </label>
+        <label class="fld"><input type="checkbox" id="crossOnly"> 상대 리그만</label>
       </div>
-      <div class="panel">
-        <div class="panel-t" id="scatterT">–</div>
-        <div class="legend">
-          <span><i style="background:var(--s2)"></i>추천 후보 상위 10</span>
-          <span><i style="background:var(--s1)"></i>현 스쿼드</span>
-          <span><i style="background:var(--ink-3)"></i>나머지 풀</span>
+    </div>
+    <p class="why" id="needNote"></p>
+    <div id="mergeNote"></div>
+
+    <div class="cand">
+      <div>
+        <div class="cand-head"><h2 id="candTitle">–</h2><span class="sub" id="candHint">–</span></div>
+        <div class="tbl cands" id="candTbl">
+          <table>
+            <thead><tr>
+              <th></th><th>선수</th><th class="c-pos">포지션</th>
+              <th class="n">출전</th><th class="n">G+A</th>
+              <th class="n" id="colA">–</th><th class="n" id="colB">–</th>
+              <th class="n">역할 점수</th>
+            </tr></thead>
+            <tbody id="candBody"></tbody>
+          </table>
         </div>
-        <figure><div id="scatter"></div>
-          <figcaption>가로·세로축은 이 역할의 대표 지표 두 개(90분당 원값)입니다. 오른쪽 위로 갈수록 둘 다 높습니다.</figcaption>
-        </figure>
+        <ol class="clist" id="candCards"></ol>
+
+        <details class="excl" id="excl">
+          <summary><b>출전 경기 부족으로 순위 제외</b> <span class="sub" id="exclN">–</span></summary>
+          <p>출전 시간은 기준을 넘었지만 출전 경기가 팀 경기의 절반에 못 미친 선수입니다. FotMob이 이 선수들의
+          90분당 지표(슈팅·패스·태클 등)를 주지 않아 역할 점수를 매길 수 없어, 0으로 채우지 않고 순위에서 뺐습니다.</p>
+          <div class="tbl" id="exclTbl"><table>
+            <thead><tr><th>선수</th><th class="c-pos">포지션</th><th class="n">출전</th><th class="n">출전 경기 / 팀 경기</th></tr></thead>
+            <tbody id="exclBody"></tbody>
+          </table></div>
+        </details>
       </div>
+
+      <aside class="side" aria-label="후보 지형">
+        <h3 id="scatterT">–</h3>
+        <div class="legend">
+          <span><i style="background:var(--accent)"></i>추천 상위 10</span>
+          <span><i style="background:var(--squad)"></i>현 스쿼드 (같은 포지션)</span>
+          <span><i style="background:var(--mid)"></i>나머지</span>
+        </div>
+        <div id="scatter"></div>
+        <p class="cap">가로·세로축은 이 역할의 대표 지표 두 개(90분당 원값)입니다.</p>
+      </aside>
     </div>
-    <div id="mergeNote" style="margin-top:14px"></div>
-    <details class="note" id="excl" style="margin-top:14px">
-      <summary style="cursor:pointer"><b>출전 경기 부족으로 순위 제외</b> <span class="num" id="exclN">–</span></summary>
-      <p style="margin:8px 0 10px">출전 시간은 기준을 넘었지만 출전 경기가 팀 경기의 절반에 못 미친 선수입니다. FotMob은 이 선수들의 슈팅·패스·태클 같은
-      90분당 지표를 제공하지 않아 역할 점수를 매길 수 없습니다. 0으로 채우지 않고 순위에서 뺐습니다. 지금 고른 역할의 대상 포지션만 보여줍니다.</p>
-      <div class="tbl-wrap"><table style="min-width:520px">
-        <thead><tr><th>선수</th><th>포지션</th><th class="n" style="text-align:right">출전</th><th class="n" style="text-align:right">출전 경기 / 팀 경기</th></tr></thead>
-        <tbody id="exclBody"></tbody>
-      </table></div>
-    </details>
   </section>
 
-  <section id="s-method">
-    <div class="sec-head"><h2>5. 방법과 한계</h2></div>
-    <div class="note">
-      <p style="margin:0 0 10px"><b>계산 방식.</b> 팀 지표는 시즌 합계를 경기 수로 나눈 값이고, 선수 지표는 출전 90분당 값입니다.
+  <!-- ===================== 모델 검증 ===================== -->
+  <section class="panel" id="p-validation" role="tabpanel" aria-labelledby="tab-validation" hidden>
+    <div class="dhead"><h2>이 모델이 실제로 예측력이 있나</h2><span class="sub" id="btHint">–</span></div>
+    <p class="placeholder" id="btNone" hidden>이 배포본에는 검증 결과 파일(backtest.json)이 없어 판정을 보여주지 않습니다. 방법 설명은 아래에 있습니다.</p>
+    <div id="btMain" hidden>
+      <ul class="verdicts" id="btVerdict"></ul>
+      <p class="why">아래 판정문은 검증 스크립트(backtest.py)가 쓴 문장 그대로입니다. 빌드업·볼 탈취·박스 수비는 예측 대상이 자기 지표라
+        "지난 시즌 원지표와 비교"가 성립하지 않아, 다음 시즌에도 유지되는지(r)만 봅니다.</p>
+      <div class="cand">
+        <div>
+          <div class="cand-head"><h2>시즌 쌍별 상관계수</h2><span class="sub">N시즌 점수와 N+1시즌 값의 피어슨 r · 막대 눈금 0.5</span></div>
+          <div class="tbl"><table class="bt">
+            <thead><tr id="btHead"></tr></thead>
+            <tbody id="btBody"></tbody>
+          </table></div>
+        </div>
+        <aside class="side" aria-label="검증 산점도">
+          <div class="side-h"><h3 id="btScatterT">–</h3>
+            <select id="btRole" aria-label="산점도 역할"></select></div>
+          <div id="btScatter"></div>
+          <p class="cap">가로축은 N시즌 역할 점수(z 합성값), 세로축은 N+1시즌 예측 대상입니다. 점이 추세선에 붙을수록 예측이 맞았다는 뜻입니다.</p>
+        </aside>
+      </div>
+    </div>
+
+    <details class="method" id="method">
+      <summary>방법과 한계</summary>
+      <p><b>계산 방식.</b> 팀 지표는 시즌 합계를 경기 수로 나눈 값이고, 선수 지표는 출전 90분당 값입니다.
       FotMob이 합계를 주는 지표(태클·인터셉트·클리어·리커버리·블록)는 반올림된 90분당 값을 쓰지 않고 합계에서 직접 계산합니다.
       후보 풀은 <span id="poolrule">–</span>인 필드 플레이어 <span class="num" id="pooln">–</span>명이고, 포지션은
       센터백·풀백(윙백 포함)·중앙 미드필더·공격형/측면·스트라이커 다섯 그룹으로 나눕니다.</p>
-      <p style="margin:0 0 10px"><b>역할 점수.</b> 출전 시간으로 축소한 지표를 후보 풀 전체 기준 z-점수로 바꿔 가중합한 뒤, 그 합의 풀 안 백분위 순위(0–100)를 보여줍니다.
+      <p id="mergeMethod" hidden></p>
+      <p><b>역할 점수.</b> 출전 시간으로 축소한 지표를 후보 풀 전체 기준 z-점수로 바꿔 가중합한 뒤, 그 합의 풀 안 백분위 순위(0–100)를 보여줍니다.
       포지션이 다른 선수끼리 같은 잣대로 비교됩니다. 역할별 지표와 가중치 — <span id="rolew">–</span>.
-      선수 행을 펼치면 나오는 막대는 이와 달리 <em>같은 포지션 그룹 안에서의</em> 백분위입니다.</p>
-      <p style="margin:0 0 10px"><b>모델을 바꾼 이유.</b> 처음에는 지표별 백분위를 가중 평균했고, 결정력은 npxG/90 0.55 + 슈팅/90 0.25 + 드리블/90 0.20이었습니다.
+      선수 행을 펼치면 나오는 막대는 이와 달리 같은 포지션 그룹 안에서의 백분위입니다.</p>
+      <p><b>모델을 바꾼 이유.</b> 처음에는 지표별 백분위를 가중 평균했고, 결정력은 npxG/90 0.55 + 슈팅/90 0.25 + 드리블/90 0.20이었습니다.
       FotMob 데이터로 처음 돌린 백테스트(커밋 921daf3)에서 이 모델은 다섯 역할 모두, 두 시즌 쌍 모두에서 "지난 시즌 원지표를 그대로 쓴 것"보다 예측력이 낮았습니다
       (결정력 r 0.61–0.62 대 지난 시즌 npxG/90 0.70–0.76). 백분위로 바꾸는 과정과 여러 지표를 섞는 과정이 정보를 깎은 것입니다.
       그래서 백분위 대신 z-점수 가중합을 쓰고, 결정력은 축소한 npxG/90 하나로 줄였습니다. 가중치는 백테스트 결과를 보고 고르지 않았습니다 —
       시즌 쌍 두 개로 고르고 같은 두 개로 검증하면 과적합이기 때문입니다.</p>
-      <p style="margin:0 0 10px"><b>표본 크기 보정.</b> 표에 보이는 per-90 값은 원값이지만, <em>백분위와 역할 점수는 출전 시간으로 축소(shrinkage)한 값</em>으로 계산합니다 —
+      <p><b>표본 크기 보정.</b> 표에 보이는 per-90 값은 원값이지만, 백분위와 역할 점수는 출전 시간으로 축소(shrinkage)한 값으로 계산합니다 —
       <span class="num">조정값 = (원값 × 출전분 + 포지션 그룹 평균 × K) / (출전분 + K)</span>. 600분만 뛴 선수의 per-90은 상당 부분이 운이라 2900분 뛴 선수와 같은 무게로 둘 수 없기 때문입니다.
       <span id="shrinkline"></span></p>
-      <p style="margin:0 0 10px"><b>점유율 보정.</b> 팀 진단의 수비 활동량(태클+인터셉트)은 상대 점유율 50%로 환산해 비교합니다
+      <p><b>점유율 보정.</b> 팀 진단의 수비 활동량(태클+인터셉트)은 상대 점유율 50%로 환산해 비교합니다
       (<span class="num">× 50 / (100 − 팀 점유율)</span>). 선수 지표에는 같은 보정을 넣지 않았습니다 — 백테스트에서 다음 시즌 예측이 오히려 나빠졌습니다.</p>
-      <p style="margin:0"><b>한계.</b> npxG는 FotMob에 없어 <span class="num">xG − 0.79 × PK 골</span>로 근사했습니다(실축한 PK는 빼지 못합니다).
+      <p><b>한계.</b> npxG는 FotMob에 없어 <span class="num">xG − 0.79 × PK 골</span>로 근사했습니다(실축한 PK는 빼지 못합니다).
       FotMob의 xG 모델은 Understat과 달라 예전 수치와 직접 비교하면 안 됩니다. 볼터치·나이·이적료는 없어 영입 현실성(계약 기간, 시장가)은 판단하지 않습니다.
       라인 브레이킹 패스는 일부 시즌(EPL 2023/24·2024/25, 라리가 2023/24)에 데이터가 없어 역할 점수에 넣지 않고 선수 상세에만 표시합니다.
       경기별 xG 추이는 경기마다 따로 받아야 해서 보여주지 않습니다. FotMob 비공식 경로라 구조가 바뀌면 갱신이 멈출 수 있습니다.</p>
-    </div>
-  </section>
-
-  <section id="s-backtest" hidden>
-    <div class="sec-head"><h2>6. 모델 검증</h2>
-      <span class="hint" id="btHint">–</span></div>
-    <div class="note" id="btVerdict" style="margin-bottom:18px"></div>
-    <div class="grid2 cand">
-      <div class="tbl-wrap">
-        <table>
-          <thead><tr id="btHead"></tr></thead>
-          <tbody id="btBody"></tbody>
-        </table>
-      </div>
-      <div class="panel">
-        <div class="panel-t" id="btScatterT">–</div>
-        <figure><div id="btScatter"></div>
-          <figcaption>지금 고른 역할입니다. 가로축이 N시즌 역할 점수(z 합성값), 세로축이 N+1시즌 예측 대상입니다. 점이 추세선에 붙을수록 예측이 맞았다는 뜻입니다.</figcaption>
-        </figure>
-      </div>
-    </div>
+    </details>
   </section>
 </main>
 
@@ -360,27 +470,45 @@ footer p{margin:0 0 8px;max-width:78ch}
 <script>
 (function(){
 "use strict";
-let D;
+let D, BT = null;
 const $ = s => document.querySelector(s);
 const el = (t,c,h)=>{const e=document.createElement(t); if(c)e.className=c; if(h!=null)e.innerHTML=h; return e;};
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const f1 = n => (Math.round(n*10)/10).toFixed(1);
 const f2 = n => (Math.round(n*100)/100).toFixed(2);
+const f3 = n => (Math.round(n*1000)/1000).toFixed(3);
+const sgn = (n, f) => (n>=0?'+':'−') + f(Math.abs(n));
+const withUnit = (v, u) => v + (/^[\/%]/.test(u) ? '' : ' ') + u;
 
 const LGNAME = {EPL:'프리미어리그', La_liga:'라리가'};
 const LGSHORT = {EPL:'PL', La_liga:'라리가'};
 const POSNAME = {CB:'센터백', FB:'풀백·윙백', CM:'중앙 미드필더', AM:'공격형·측면', ST:'스트라이커'};
-const POS5 = ['CB','FB','CM','AM','ST'];
+const POS5 = ['ST','AM','CM','FB','CB'];
 const peerName = g => g.split('+').map(x=>POSNAME[x]).join('+');
+/* 받침에 맞는 조사: 받침이 없거나 ㄹ이면 '로', 그 밖의 받침이면 '으로' */
+const ro = w => { const c = w.charCodeAt(w.length-1) - 0xAC00; const j = (c>=0 && c<11172) ? c % 28 : 0; return w + (j===0 || j===8 ? '로' : '으로'); };
+const roleShort = k => D.roles[k].split(' (')[0];
 
-/* ---- team metric dictionary (FotMob) ---- */
+const MLAB = {npxG90:'npxG/90', xA90:'xA/90', sh90:'슈팅/90', drib90:'드리블/90', chances90:'기회 창출/90', bigch90:'빅찬스/90',
+  pass90:'성공 패스/90', long90:'성공 롱볼/90', tkl90:'태클/90', int90:'인터셉트/90', rec90:'리커버리/90', clr90:'클리어/90', blk90:'블록/90'};
+const ROLECOLS = {finisher:['npxG90','sh90'], creator:['xA90','chances90'], progressor:['pass90','long90'],
+  ballwinner:['tkl90','int90'], boxdef:['clr90','blk90']};
+/* 선수 프로필 막대 13개 — 세 묶음 */
+const PGROUPS = [
+  ['공격',      [['npxG90','득점 기대값'],['sh90','슈팅'],['drib90','드리블']]],
+  ['창출·패스', [['xA90','기회 제공'],['chances90','기회 창출'],['bigch90','빅찬스 창출'],['pass90','성공 패스'],['long90','성공 롱볼']]],
+  ['수비',      [['tkl90','태클'],['int90','인터셉트'],['rec90','리커버리'],['clr90','클리어'],['blk90','블록']]]
+];
+
+/* 팀 지표 사전 (FotMob) — 팀 진단 탭과 필요 역할의 근거 문장이 같이 쓴다 */
 const TM = [
   {k:'xG90',       label:'기회 창출 (xG)',      unit:'/경기', val:t=>f2(t.xG90),
    good:'경기당 만들어내는 기대득점이 많다', bad:'기회 자체를 못 만든다'},
   {k:'xGA90',      label:'기회 억제 (피xG)',    unit:'/경기', val:t=>f2(t.xGA90),
    good:'상대에게 좋은 슛을 거의 안 준다', bad:'상대에게 좋은 슛을 너무 많이 내준다'},
-  {k:'finishing',  label:'결정력 (득점−xG)',    unit:'골',    val:t=>(t.finishing>=0?'+':'')+f1(t.finishing),
+  {k:'finishing',  label:'결정력 (득점−xG)',    unit:'골',    val:t=>sgn(t.finishing, f1),
    good:'기대치보다 더 넣는다', bad:'만든 기회를 골로 못 바꾼다'},
-  {k:'keeping',    label:'실점 억제 (피xG−실점)',unit:'골',   val:t=>(t.keeping>=0?'+':'')+f1(t.keeping),
+  {k:'keeping',    label:'실점 억제 (피xG−실점)',unit:'골',   val:t=>sgn(t.keeping, f1),
    good:'골키퍼·수비가 기대치보다 잘 막는다', bad:'막아야 할 슛을 실점으로 내준다'},
   {k:'box90',      label:'박스 침투',            unit:'터치/경기', val:t=>f1(t.box90),
    good:'상대 페널티 박스 안에서 공을 자주 잡는다', bad:'상대 박스 안까지 못 들어간다'},
@@ -392,70 +520,37 @@ const TM = [
    good:'점유율을 감안해도 태클·인터셉트가 많다', bad:'점유율을 감안하면 태클·인터셉트가 적다'}
 ];
 
-/* ---- role → 표·산점도에 보여줄 대표 지표 두 개 ---- */
-const MLAB = {npxG90:'npxG/90', xA90:'xA/90', sh90:'슈팅/90', drib90:'드리블/90', chances90:'기회 창출/90', bigch90:'빅찬스/90',
-  pass90:'성공 패스/90', long90:'성공 롱볼/90', tkl90:'태클/90', int90:'인터셉트/90', rec90:'리커버리/90', clr90:'클리어/90', blk90:'블록/90'};
-const ROLECOLS = {finisher:['npxG90','sh90'], creator:['xA90','chances90'], progressor:['pass90','long90'],
-  ballwinner:['tkl90','int90'], boxdef:['clr90','blk90']};
-const PM = [['npxG90','득점 기대값'],['sh90','슈팅'],['drib90','드리블'],['xA90','기회 제공'],['chances90','기회 창출'],['bigch90','빅찬스 창출'],
-  ['pass90','성공 패스'],['long90','성공 롱볼'],['tkl90','태클'],['int90','인터셉트'],['rec90','리커버리'],['clr90','클리어'],['blk90','블록']];
+/* 포지션 생산량 약점 → 그 약점을 메울 역할 (역할 대상 그룹에 그 포지션이 있는 조합만) */
+const POS_WEAK = [
+  {pos:'ST', m:'npxG90', role:'finisher', lab:'득점 생산', bad:'라인이 직접 만들어내는 슛 기대값이 적다'},
+  {pos:'AM', m:'npxG90', role:'finisher', lab:'득점 생산', bad:'라인이 직접 만들어내는 슛 기대값이 적다'},
+  {pos:'AM', m:'xA90',   role:'creator',  lab:'기회 제공', bad:'라인에서 나오는 결정적 패스가 적다'},
+  {pos:'CM', m:'xA90',   role:'creator',  lab:'기회 제공', bad:'라인에서 나오는 결정적 패스가 적다'},
+  {pos:'FB', m:'xA90',   role:'creator',  lab:'기회 제공', bad:'라인에서 나오는 결정적 패스가 적다'}
+];
+const POS_WEAK_CUT = 45;   // 팀 진단에서 포지션 약점으로 부르는 백분위 기준
+const posWeakItems = t => POS_WEAK.map(w=>Object.assign({}, w, {p:t.by_pos[w.pos].pct[w.m], label:POSNAME[w.pos]+' '+w.lab}));
+const ROLE_ORDER = ['finisher','creator','progressor','ballwinner','boxdef'];
 
 /* ---- state ---- */
-const S = {lg:'EPL', team:null, role:null, mins:600, cross:false, pos:'ALL'};
+const TABS = ['diagnosis','recruit','validation'];
+const S = {lg:'EPL', team:null, role:null, mins:600, cross:false, pos:'ALL', open:null, tab:'recruit', btRole:null};
+let NEED = null;   // computeNeeds 결과
 
-/* ---- meta ---- */
-function initMeta(){
-  $('#m-season').textContent = D.meta.season;
-  $('#m-form').textContent = D.meta.form_season;
-  $('#m-pool').textContent = D.players.length + '명';
-  $('#m-upd').textContent = D.meta.generated;
-  $('#genline').textContent = '집계 기준일 ' + D.meta.generated + ' · 후보 풀은 ' + D.meta.season + ' 시즌 ' + D.meta.pool_rule + '인 필드 플레이어입니다. 데이터는 매일 자동으로 다시 내려받습니다.';
-  $('#poolrule').textContent = D.meta.pool_rule;
-  $('#pooln').textContent = D.players.length;
-  const rw = D.role_weights || {};
-  $('#rolew').innerHTML = Object.keys(D.roles).map(k=>'<b>'+esc(D.roles[k].split(' (')[0])+'</b> = '
-    + Object.keys(rw[k]).map(m=>esc(MLAB[m]||m)+(Object.keys(rw[k]).length>1?' '+rw[k][m]:'')).join(' + ')
-    + ' <span style="color:var(--ink-3)">(' + D.role_groups[k].map(g=>POSNAME[g]).join('·') + ')</span>').join(', ');
-  const mg = D.meta.groups_merged || [];
-  if(mg.length){
-    $('#mergeNote').innerHTML = '<div class="note" style="border-color:var(--warn)"><b>포지션 그룹을 자동으로 합쳤습니다.</b> '
-      + mg.map(x=>POSNAME[x.group]||x.group).join(', ') + ' 그룹이 ' + D.meta.min_group + '명 미만이라 백분위가 거칠어지므로 이웃 그룹과 합쳐 계산했습니다 — '
-      + mg.map(x=>esc(x.group)+' '+x.n+'명 + '+esc(x.into)+' '+x.n_into+'명 → '+esc(x.result)+' '+x.n_result+'명').join(' · ') + '.</div>';
-  }
-  const sk = D.meta.shrink && D.meta.shrink.k;
-  if(sk){
-    const est = Object.keys(sk).filter(m=>sk[m].source==='estimated');
-    const parts = Object.keys(sk).map(m=>m.replace('90','')+' '+sk[m].K);
-    $('#shrinkline').innerHTML = 'K는 ' + (est.length
-      ? '완주한 연속 두 시즌 모두 후보 풀에 든 선수 ' + sk[est[0]].n + '명의 시즌간 상관계수에서 추정했습니다 (K ≈ 평균 출전분 × (1−r)/r)'
-      : '표본이 모자라 기본값을 썼습니다') + ' — <span class="num">' + parts.join(', ') + '</span>분.';
-  }
+/* ---- 백분위 막대 (하나의 컴포넌트) ----
+   o.two=true면 50 기준 양방향(팀 지표 — 50 미만만 빨강), 아니면 0부터 한 색(선수 백분위·검증 r).
+   o.v: 오른쪽 값 글자 (기본은 백분위), o.sub: 라벨 옆 작은 원값, label이 ''이면 라벨 칸 없음. */
+function pbar(label, p, o){
+  o = o || {};
+  const has = p != null && !isNaN(p);
+  const c = has ? Math.max(0, Math.min(100, p)) : 0;
+  const neg = o.two && has && c < 50;
+  const style = o.two ? ((c>=50?'left:50%':'right:50%') + ';width:' + Math.abs(c-50) + '%') : 'left:0;width:' + c + '%';
+  return '<div class="pbar'+(label===''?' nl':'')+'"'+(o.title?' title="'+esc(o.title)+'"':'')+'>'
+    + (label==='' ? '' : '<span class="l">'+esc(label)+(o.sub?'<small>'+esc(o.sub)+'</small>':'')+'</span>')
+    + '<span class="t"><i class="f'+(neg?' neg':'')+'" style="'+style+'"></i></span>'
+    + '<span class="v">'+(o.v!=null ? o.v : has ? f1(p) : '—')+'</span></div>';
 }
-
-/* ---- controls ---- */
-function fillTeams(){
-  const sel = $('#teamSel'); sel.innerHTML='';
-  D.teams[S.lg].slice().sort((a,b)=>b.pts-a.pts).forEach(t=>{
-    const o=document.createElement('option'); o.value=t.name;
-    o.textContent = t.name + '  (' + t.pts + '점)';
-    sel.appendChild(o);
-  });
-  S.team = sel.value;
-}
-['EPL','La_liga'].forEach(lg=>{
-  $('#lg-'+lg).addEventListener('click',()=>{
-    S.lg=lg;
-    $('#lg-EPL').setAttribute('aria-pressed', String(lg==='EPL'));
-    $('#lg-La_liga').setAttribute('aria-pressed', String(lg==='La_liga'));
-    fillTeams(); S.role=null; render();
-  });
-});
-$('#teamSel').addEventListener('change',e=>{S.team=e.target.value; S.role=null; render();});
-$('#minsRange').addEventListener('input',e=>{S.mins=+e.target.value; $('#minsOut').textContent=S.mins; renderCandidates();});
-$('#crossOnly').addEventListener('change',e=>{S.cross=e.target.checked; renderCandidates();});
-$('#posSel').addEventListener('change',e=>{S.pos=e.target.value; renderCandidates();});
-
-const team = () => D.teams[S.lg].find(t=>t.name===S.team);
 
 /* ---- tooltip ---- */
 const tip = $('#tip');
@@ -467,147 +562,83 @@ function showTip(html,x,y){
 }
 const hideTip = ()=>{tip.style.opacity='0';};
 
-/* ---- 1. diagnosis ---- */
-function renderTeam(){
-  const t = team();
-  $('#t-league').textContent = LGNAME[S.lg] + ' · ' + D.meta.season;
-  $('#t-name').textContent = t.name;
-
-  const kpis = [
-    ['승점', t.pts, t.w + '승 ' + t.d + '무 ' + t.l + '패'],
-    ['득실', t.gf + '−' + t.ga, '경기당 ' + f2(t.gf90) + '−' + f2(t.ga90)],
-    ['xG 차이', (t.xGD90>=0?'+':'')+f2(t.xGD90), '경기당'],
-    ['결정력', (t.finishing>=0?'+':'')+f1(t.finishing), '득점−xG']
-  ];
-  $('#t-kpis').innerHTML = kpis.map(([a,b,c])=>
-    '<div class="kpi"><dt>'+a+'</dt><dd>'+b+'<small>'+c+'</small></dd></div>').join('');
-
-  $('#t-form').innerHTML = '<span class="lbl">마지막 6경기</span>' +
-    t.form.map(r=>'<span class="fm '+r+'" title="'+({w:'승',d:'무',l:'패'}[r])+'">'+({w:'W',d:'D',l:'L'}[r])+'</span>').join('');
-
-  const n = t.form_now;
-  $('#t-now').innerHTML = n
-    ? '<div class="note" style="padding:10px 13px;font-size:12.5px"><b>'+D.meta.form_season+' 현재</b> '+n.mp+'경기 '+n.pts+'점 · 경기당 xG 차이 <span class="num">'+(n.xGD90>=0?'+':'')+f2(n.xGD90)+'</span></div>'
-    : '';
-
-  const lad = $('#ladder'); lad.innerHTML='';
-  TM.forEach(m=>{
-    const p = t.pct[m.k];
-    const row = el('div','lrow');
-    row.appendChild(el('div','nm', m.label));
-    const bar = el('div','lbar');
-    bar.appendChild(el('div','axis'));
-    const fill = el('div','fill'+(p<50?' neg':''));
-    const half = Math.abs(p-50)/50*50;
-    if(p>=50){ fill.style.left='50%'; fill.style.width=half+'%'; }
-    else { fill.style.right='50%'; fill.style.width=half+'%'; }
-    bar.appendChild(fill);
-    bar.addEventListener('mousemove',e=>showTip('<b>'+m.label+'</b><br>값 <span class="num">'+m.val(t)+'</span> '+m.unit+'<br>리그 백분위 <span class="num">'+f1(p)+'</span>',e.clientX,e.clientY));
-    bar.addEventListener('mouseleave',hideTip);
-    row.appendChild(bar);
-    row.appendChild(el('div','pc', f1(p)));
-    lad.appendChild(row);
+/* ---- 탭 (URL hash) ---- */
+function setTab(name, push){
+  if(!TABS.includes(name)) name = 'recruit';
+  S.tab = name;
+  TABS.forEach(t=>{
+    const b = $('#tab-'+t), on = t===name;
+    b.setAttribute('aria-selected', String(on)); b.tabIndex = on ? 0 : -1;
+    $('#p-'+t).hidden = !on;
   });
-
-  const pl = $('#posladder'); pl.innerHTML='';
-  POS5.forEach(pos=>{
-    [['npxG90','득점 생산'],['xA90','기회 제공']].forEach(([mk,lab])=>{
-      const bp = t.by_pos[pos]; const p = bp.pct[mk];
-      const row = el('div','lrow');
-      row.appendChild(el('div','nm', POSNAME[pos]+' · '+lab));
-      const bar = el('div','lbar'); bar.appendChild(el('div','axis'));
-      const fill = el('div','fill'+(p<50?' neg':''));
-      const half = Math.abs(p-50)/50*50;
-      if(p>=50){fill.style.left='50%';fill.style.width=half+'%';}else{fill.style.right='50%';fill.style.width=half+'%';}
-      bar.appendChild(fill);
-      bar.addEventListener('mousemove',e=>showTip('<b>'+POSNAME[pos]+' '+lab+'</b><br>'+(mk==='npxG90'?'npxG':'xA')+'/90 <span class="num">'+f2(bp[mk])+'</span><br>리그 백분위 <span class="num">'+f1(p)+'</span> · '+bp.n+'명',e.clientX,e.clientY));
-      bar.addEventListener('mouseleave',hideTip);
-      row.appendChild(bar); row.appendChild(el('div','pc', f1(p)));
-      pl.appendChild(row);
-    });
-  });
+  if(push && location.hash !== '#'+name) history.replaceState(null, '', '#'+name);
 }
-
-/* ---- 2. findings ---- */
-function findings(){
-  const t = team();
-  const items = TM.map(m=>({m, p:t.pct[m.k]}));
-  const posItems = [];
-  ['ST','AM','CM'].forEach(pos=>posItems.push({label:POSNAME[pos]+' 득점 생산', p:t.by_pos[pos].pct.npxG90,
-    bad:POSNAME[pos]+' 라인이 직접 만들어내는 슛 기대값이 리그 최하위권'}));
-  ['AM','CM','FB'].forEach(pos=>posItems.push({label:POSNAME[pos]+' 기회 제공', p:t.by_pos[pos].pct.xA90,
-    bad:POSNAME[pos]+' 라인에서 나오는 결정적 패스가 리그 최하위권'}));
-  const weak = items.slice().sort((a,b)=>a.p-b.p).filter(x=>x.p<50).slice(0,3);
-  const strong = items.slice().sort((a,b)=>b.p-a.p).slice(0,2);
-  const weakPos = posItems.slice().sort((a,b)=>a.p-b.p)[0];
-
-  const rank = p => Math.max(1, Math.round(20 - p/100*20 + 0.5));
-  const box = $('#findings'); box.innerHTML='';
-  if(!weak.length){
-    box.appendChild(el('div','find good','<h4>뚜렷한 약점 없음</h4><p>'+TM.length+'개 팀 지표가 모두 리그 중간값 이상입니다. 아래 보강안은 개선 여지가 가장 큰 쪽을 참고용으로 제시합니다.</p>'));
-  }
-  weak.forEach(w=>{
-    box.appendChild(el('div','find',
-      '<h4>'+w.m.label+'</h4><p>'+w.m.bad+'. 리그 <span class="rk">'+rank(w.p)+'위</span> / 20 · 백분위 <span class="rk">'+f1(w.p)+'</span> · 값 <span class="rk">'+w.m.val(t)+'</span> '+w.m.unit+'</p>'));
+document.querySelectorAll('.tabs button').forEach((b,i,all)=>{
+  b.addEventListener('click',()=>setTab(b.dataset.tab, true));
+  b.addEventListener('keydown',e=>{
+    if(e.key!=='ArrowRight' && e.key!=='ArrowLeft') return;
+    const n = all[(i + (e.key==='ArrowRight'?1:all.length-1)) % all.length];
+    n.focus(); setTab(n.dataset.tab, true);
   });
-  if(weakPos && weakPos.p < 45){
-    box.appendChild(el('div','find',
-      '<h4>'+weakPos.label+'</h4><p>'+weakPos.bad+'. 백분위 <span class="rk">'+f1(weakPos.p)+'</span></p>'));
-  }
-  strong.forEach(w=>{
-    box.appendChild(el('div','find good',
-      '<h4>'+w.m.label+'</h4><p>'+w.m.good+'. 리그 <span class="rk">'+rank(w.p)+'위</span> / 20 · 백분위 <span class="rk">'+f1(w.p)+'</span></p>'));
+});
+addEventListener('hashchange',()=>setTab(location.hash.slice(1), false));
+
+/* ---- controls ---- */
+function fillTeams(){
+  const sel = $('#teamSel'); sel.innerHTML='';
+  D.teams[S.lg].slice().sort((a,b)=>(a.rank||99)-(b.rank||99) || b.pts-a.pts).forEach(t=>{
+    const o=document.createElement('option'); o.value=t.name;
+    o.textContent = (t.rank? t.rank+'. ':'') + t.name + '  ' + t.pts + '점';
+    sel.appendChild(o);
   });
-  return {weak, weakPos};
+  S.team = sel.value;
 }
+['EPL','La_liga'].forEach(lg=>{
+  $('#lg-'+lg).addEventListener('click',()=>{
+    S.lg=lg;
+    $('#lg-EPL').setAttribute('aria-pressed', String(lg==='EPL'));
+    $('#lg-La_liga').setAttribute('aria-pressed', String(lg==='La_liga'));
+    fillTeams(); S.role=null; S.open=null; render();
+  });
+});
+$('#teamSel').addEventListener('change',e=>{S.team=e.target.value; S.role=null; S.open=null; render();});
+$('#minsRange').addEventListener('input',e=>{S.mins=+e.target.value; $('#minsOut').textContent=S.mins; renderRecruit();});
+$('#crossOnly').addEventListener('change',e=>{S.cross=e.target.checked; renderRecruit();});
+$('#posSel').addEventListener('change',e=>{S.pos=e.target.value; renderRecruit();});
+$('#btRole').addEventListener('change',e=>{S.btRole=e.target.value; btScatter();});
+const team = () => D.teams[S.lg].find(t=>t.name===S.team);
+function setPos(v){ S.pos = v; $('#posSel').value = v; }
+/* 같은 리그 안 순위 (백분위가 높을수록 1위, 방향은 이미 뒤집혀 있다) */
+const rankOf = (p, ps) => 1 + ps.filter(x=>x > p).length;
 
-/* ---- 3. needs ---- */
-const ROLE_ORDER = ['finisher','creator','progressor','ballwinner','boxdef'];
-function needs(diag){
-  const t = diag.t || team();
-  const score = {}, why = {};
-  ROLE_ORDER.forEach(r=>{score[r]=0; why[r]=[];});
-  const add=(r,pts,txt)=>{score[r]+=pts; if(txt) why[r].push(txt);};
-
-  const p = t.pct, bp = t.by_pos;
-  if(p.xG90 < 50)      add('finisher', 50-p.xG90, '기회 창출 백분위 '+f1(p.xG90));
-  if(p.finishing < 50) add('finisher', (50-p.finishing)*0.8, '결정력 백분위 '+f1(p.finishing));
-  if(bp.ST.pct.npxG90 < 50) add('finisher', (50-bp.ST.pct.npxG90)*1.1, '스트라이커 득점 생산 백분위 '+f1(bp.ST.pct.npxG90));
-
-  if(p.box90 < 50)       add('creator', 50-p.box90, '박스 침투 백분위 '+f1(p.box90));
-  if(bp.AM.pct.xA90 < 50) add('creator', 50-bp.AM.pct.xA90, '공격형·측면 기회 제공 백분위 '+f1(bp.AM.pct.xA90));
-  if(bp.CM.pct.xA90 < 50) add('creator', (50-bp.CM.pct.xA90)*0.6, '중앙 미드필더 기회 제공 백분위 '+f1(bp.CM.pct.xA90));
-
-  if(p.poss < 50)  add('progressor', (50-p.poss)*0.8, '점유 백분위 '+f1(p.poss));
-  if(p.box90 < 50) add('progressor', (50-p.box90)*0.4, null);
-
-  if(p.press90 < 50)    add('ballwinner', 50-p.press90, '전방 압박 백분위 '+f1(p.press90));
-  if(p.defact_adj < 50) add('ballwinner', (50-p.defact_adj)*0.8, '수비 활동량(점유 보정) 백분위 '+f1(p.defact_adj));
-
-  if(p.xGA90 < 50)   add('boxdef', 50-p.xGA90, '기회 억제 백분위 '+f1(p.xGA90));
-  if(p.keeping < 50) add('boxdef', (50-p.keeping)*0.4, '실점 억제 백분위 '+f1(p.keeping));
-
+/* ---- 필요한 역할 계산 ---- */
+function computeNeeds(t){
+  const score = {}, why = {}, posPts = {};
+  ROLE_ORDER.forEach(r=>{score[r]=0; why[r]=[]; posPts[r]={};});
+  const add=(r,pts,txt,pos)=>{score[r]+=pts; if(txt) why[r].push({txt, pts}); if(pos) posPts[r][pos]=(posPts[r][pos]||0)+pts;};
+  const p = t.pct, all = D.teams[S.lg];
+  /* 팀 단위 근거는 백분위 대신 리그 순위로 말한다 */
+  const tr = k => '리그 '+rankOf(p[k], all.map(x=>x.pct[k]))+'위 / '+all.length;
+  const trPos = w => '리그 '+rankOf(w.p, all.map(x=>x.by_pos[w.pos].pct[w.m]))+'위 / '+all.length;
+  if(p.xG90 < 50)      add('finisher', 50-p.xG90, '기회 창출 '+tr('xG90'));
+  if(p.finishing < 50) add('finisher', (50-p.finishing)*0.8, '결정력 '+tr('finishing'));
+  if(p.box90 < 50)     add('creator', 50-p.box90, '박스 침투 '+tr('box90'));
+  if(p.poss < 50)      add('progressor', (50-p.poss)*0.8, '점유 '+tr('poss'));
+  if(p.box90 < 50)     add('progressor', (50-p.box90)*0.4, null);
+  if(p.press90 < 50)    add('ballwinner', 50-p.press90, '전방 압박 '+tr('press90'));
+  if(p.defact_adj < 50) add('ballwinner', (50-p.defact_adj)*0.8, '수비 활동량(점유 보정) '+tr('defact_adj'));
+  if(p.xGA90 < 50)   add('boxdef', 50-p.xGA90, '기회 억제 '+tr('xGA90'));
+  if(p.keeping < 50) add('boxdef', (50-p.keeping)*0.4, '실점 억제 '+tr('keeping'));
+  posWeakItems(t).forEach(w=>{ if(w.p < 50) add(w.role, (50-w.p)*1.1, w.label+' '+trPos(w), w.pos); });
+  const posHint = {};
+  ROLE_ORDER.forEach(r=>{ const ks=Object.keys(posPts[r]); if(ks.length) posHint[r]=ks.sort((a,b)=>posPts[r][b]-posPts[r][a])[0]; });
+  ROLE_ORDER.forEach(r=>why[r].sort((a,b)=>b.pts-a.pts));
   const order = ROLE_ORDER.slice().sort((a,b)=>score[b]-score[a]);
-  if(!S.role) S.role = order[0];
-
-  const box=$('#needs'); box.innerHTML='';
-  order.forEach(r=>{
-    const b=el('button','chip', D.roles[r] + (score[r]>0? ' <span class="bd">우선도 '+Math.round(score[r])+'</span>':''));
-    b.setAttribute('aria-pressed', String(S.role===r));
-    b.addEventListener('click',()=>{S.role=r; needs({t}); renderCandidates();});
-    box.appendChild(b);
-  });
-
-  const w = why[S.role] || [];
-  const grp = D.role_groups[S.role].map(g=>POSNAME[g]).join('·');
-  $('#needNote').innerHTML = w.length
-    ? '<div class="note"><b>'+D.roles[S.role]+'</b> 자원이 필요한 근거 — ' + w.join(' · ') + '. 아래 명단은 두 리그의 '+grp+' 중 이 역할 점수가 높은 순입니다.</div>'
-    : '<div class="note">이 역할은 현재 스쿼드의 뚜렷한 약점으로 잡히지 않았습니다. 참고용 명단으로 보세요 (대상: '+grp+').</div>';
+  return {order, score, why, posHint, rec: score[order[0]] > 0 ? order[0] : null};
 }
 
-/* ---- 4. candidates ---- */
+/* ---- 후보 ---- */
 const groupsNow = () => S.pos!=='ALL' ? [S.pos] : D.role_groups[S.role];
-
 function candidatePool(){
   const t = team(), groups = groupsNow();
   return D.players.filter(p=>{
@@ -618,216 +649,331 @@ function candidatePool(){
   }).sort((a,b)=> b.r[S.role]-a.r[S.role]);
 }
 
-function renderCandidates(){
-  const list = candidatePool();
-  const top = list.slice(0,15);
-  const [ka, kb] = ROLECOLS[S.role];
-  $('#colA').textContent = MLAB[ka];
-  $('#colB').textContent = MLAB[kb];
-  $('#candHint').textContent = D.roles[S.role] + ' · ' + groupsNow().map(g=>POSNAME[g]).join('·') + ' ' + list.length + '명 중 상위 15명 · ' + S.mins + '분 이상'
-    + (S.cross? ' · 상대 리그만':'');
+/* ---- 결론 스트립 ---- */
+function renderStrip(list){
+  const t = team(), N = NEED;
+  $('#strip').hidden = false;
+  $('#strip').style.setProperty('--team', t.color || 'var(--line)');
+  $('#st-lg').textContent = LGNAME[S.lg] + ' · ' + D.meta.season;
+  $('#st-name').textContent = t.name;
+  const n = D.teams[S.lg].length;
+  $('#st-kpi').innerHTML =
+      '<div><dt>승점</dt><dd>'+t.pts+'<small>'+t.w+'승 '+t.d+'무 '+t.l+'패</small></dd></div>'
+    + '<div><dt>순위</dt><dd>'+(t.rank||'–')+'<small>/ '+n+'</small></dd></div>'
+    + '<div><dt>xG 차이</dt><dd>'+sgn(t.xGD90, f2)+'<small>경기당</small></dd></div>';
+  const w = N.why[S.role];
+  $('#st-need').innerHTML = N.score[S.role] > 0
+    ? '필요한 역할 <b>'+esc(roleShort(S.role))+'</b> — '+w.slice(0,2).map(x=>esc(x.txt)).join(' · ')
+    : '<b>뚜렷한 약점 없음</b> — 참고로 '+esc(roleShort(S.role))+' 후보를 보여줍니다';
+  const top = list.slice(0,3);
+  $('#st-top').innerHTML = '<span class="lbl">후보 Top 3</span>' + top.map((p,i)=>
+    '<button class="pchip" data-id="'+p.id+'" data-l="'+p.l+'"><span class="rk">'+(i+1)+'</span>'+esc(p.n)
+    + ' <span class="tm">'+esc(p.t)+'</span><span class="sc">'+f1(p.r[S.role])+'</span></button>').join('')
+    + (top.length? '' : '<span class="sub">조건에 맞는 후보가 없습니다</span>');
+  $('#st-top').querySelectorAll('.pchip').forEach(b=>b.addEventListener('click',()=>{
+    S.open = b.dataset.l + ':' + b.dataset.id;
+    setTab('recruit', true); renderRecruit();
+    const target = [...document.querySelectorAll('[data-key="'+S.open+'"]')].find(e=>e.offsetParent);
+    if(target){ target.scrollIntoView({block:'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'}); target.focus({preventScroll:true}); }
+  }));
+}
 
+/* ===================== 팀 진단 ===================== */
+function renderDiagnosis(){
+  const t = team(), all = D.teams[S.lg], n = all.length;
+  $('#dg-hint').textContent = '리그 '+n+'개 팀 안 백분위 · 50이 리그 중간';
+  $('#tm-sub').textContent = '시즌 합계를 경기 수로 나눈 값 · 리그 '+n+'개 팀 안 백분위';
+
+  // 결론: 약점(낮은 순 최대 3) → 강점(높은 순 2). 팀 지표에 약점이 없으면 한 문장으로 합친다.
+  const items = TM.map(m=>({m, p:t.pct[m.k], rk:rankOf(t.pct[m.k], all.map(x=>x.pct[m.k]))}));
+  const weak = items.filter(x=>x.p<50).sort((a,b)=>a.p-b.p).slice(0,3);
+  const strong = items.slice().sort((a,b)=>b.p-a.p).slice(0,2);
+  const posWeak = posWeakItems(t).filter(x=>x.p<POS_WEAK_CUT).sort((a,b)=>a.p-b.p);
+  const wp = posWeak[0];
+  const li = (cls, k, body) => '<li><span class="k '+cls+'">'+k+'</span><div>'+body+'</div></li>';
+  const fm = s => ' <span class="fm">'+s+'</span>';
+  const posBody = w => '<b>'+esc(w.label)+'</b> — '+esc(w.bad)+'.'
+    + fm('리그 '+rankOf(w.p, all.map(x=>x.by_pos[w.pos].pct[w.m]))+'위 / '+n);
+  let h = '';
+  if(!weak.length){
+    h += wp
+      ? li('neg','약점', '<b>팀 지표엔 약점 없음 · 포지션별로는 '+posWeak.length+'개</b> — '+TM.length+'개 팀 지표가 모두 리그 중간 이상입니다. '
+          + '포지션별로는 '+posBody(wp))
+      : li('', '약점', '<b>뚜렷한 약점 없음</b> — '+TM.length+'개 팀 지표와 포지션별 생산량이 모두 리그 중간 근처 이상입니다. 영입 후보는 참고용입니다.');
+  } else {
+    weak.forEach(w=>{ h += li('neg','약점', '<b>'+esc(w.m.label)+'</b> — '+esc(w.m.bad)+'.'
+      + fm('리그 '+w.rk+'위 / '+n+' · '+withUnit(w.m.val(t), w.m.unit))); });
+    if(wp) h += li('neg','약점', posBody(wp));
+  }
+  strong.forEach(w=>{ h += li('pos','강점', '<b>'+esc(w.m.label)+'</b> — '+esc(w.m.good)+'.'
+    + fm('리그 '+w.rk+'위 / '+n+' · '+withUnit(w.m.val(t), w.m.unit))); });
+  $('#finds').innerHTML = h;
+
+  // 부수 정보: 득실 · 최근 6경기 · 현재 시즌
+  const fn = t.form_now;
+  $('#dg-meta').innerHTML =
+      '<span>득실 <b>'+t.gf+'−'+t.ga+'</b> (경기당 '+f2(t.gf90)+'−'+f2(t.ga90)+')</span>'
+    + '<span>'+esc(D.meta.season)+' 마지막 6경기 <span class="fmw">'+t.form.map(r=>'<span title="'+({w:'승',d:'무',l:'패'}[r])+'">'+({w:'W',d:'D',l:'L'}[r])+'</span>').join('')+'</span> <span class="fml">→ 최근</span></span>'
+    + (fn ? '<span>'+esc(D.meta.form_season)+' 현재 <b>'+fn.mp+'</b>경기 <b>'+fn.pts+'</b>점 · 경기당 xG 차이 <b>'+sgn(fn.xGD90, f2)+'</b></span>' : '');
+
+  $('#tmBars').innerHTML = TM.map(m=>pbar(m.label, t.pct[m.k], {two:true, sub:withUnit(m.val(t), m.unit),
+    title:m.label+' — 리그 '+rankOf(t.pct[m.k], all.map(x=>x.pct[m.k]))+'위 / '+n+' (백분위 '+f1(t.pct[m.k])+')'})).join('');
+
+  $('#posBars').innerHTML = POS5.map(pos=>{
+    const bp = t.by_pos[pos];
+    return '<div class="grp-h">'+POSNAME[pos]+' <span class="num">'+bp.n+'</span>명</div>'
+      + [['npxG90','득점 생산','npxG'],['xA90','기회 제공','xA']].map(([mk,lab,u])=>
+        pbar(lab, bp.pct[mk], {two:true, sub:f2(bp[mk])+' '+u+'/90',
+          title:POSNAME[pos]+' '+lab+' — 리그 '+rankOf(bp.pct[mk], all.map(x=>x.by_pos[pos].pct[mk]))+'위 / '+n+' (백분위 '+f1(bp.pct[mk])+')'})).join('');
+  }).join('');
+}
+
+/* ===================== 영입 후보 ===================== */
+function renderNeeds(){
+  const N = NEED;
+  const box=$('#needs'); box.innerHTML='';
+  N.order.forEach(r=>{
+    const b=el('button','chip', esc(roleShort(r)) + (r===N.rec ? ' <span class="rec">추천</span>' : ''));
+    b.setAttribute('aria-pressed', String(S.role===r));
+    b.addEventListener('click',()=>{S.role=r; S.open=null; setPos(N.posHint[r] || 'ALL'); renderRecruit();});
+    box.appendChild(b);
+  });
+  const w = N.why[S.role];
+  const grp = groupsNow().map(g=>POSNAME[g]).join('·');
+  const posNote = (S.pos!=='ALL' && N.posHint[S.role]===S.pos) ? ' 약점이 '+POSNAME[S.pos]+' 라인에 있어 포지션을 '+ro(POSNAME[S.pos])+' 맞췄습니다.' : '';
+  $('#needNote').innerHTML = w.length
+    ? '<b>근거</b> '+w.map(x=>esc(x.txt)).join(' · ')+'.'+posNote+' 두 리그의 '+esc(grp)+' 중 이 역할 점수가 높은 순입니다.'
+    : '이 역할은 현재 스쿼드의 뚜렷한 약점으로 잡히지 않았습니다. 참고용 명단입니다 (대상: '+esc(grp)+').';
+}
+
+function detailHtml(p){
+  // 숫자 줄: 평점 · 이번 시즌 출전·골·도움 · 결정력 초과 (+ 라인 브레이킹 패스, 표시 전용)
+  const kv = [];
+  kv.push([D.meta.season+' 평점', p.rating!=null ? '<span class="num">'+f2(p.rating)+'</span>' : '—']);
+  kv.push([D.meta.form_season+' 현재', p.now
+    ? '<span class="num">'+p.now.m+'</span>분 · <span class="num">'+p.now.g+'</span>골 · <span class="num">'+p.now.a+'</span>도움'
+    : '90분 미만']);
+  kv.push(['결정력 초과 (득점−npxG)', '<span class="num">'+sgn(p.fin, f2)+'</span>골']);
+  if(p.lbp90!=null) kv.push(['라인 브레이킹 패스', '<span class="num">'+f2(p.lbp90)+'</span>/90']);
+  return '<dl class="nrow">'+kv.map(([a,b])=>'<div><dt>'+esc(a)+'</dt><dd>'+b+'</dd></div>').join('')+'</dl>'
+    + '<div class="pgroups">' + PGROUPS.map(([g, ms])=>'<div class="pgroup"><h4>'+g+'</h4>'
+        + ms.map(([k,lab])=>pbar(lab, p.pc[k], {title:MLAB[k]+' '+f2(p[k])})).join('') + '</div>').join('') + '</div>'
+    + '<p class="det-note">막대는 '+esc(peerName(p.pg))+' 그룹 안 백분위입니다'+(p.pg.indexOf('+')>=0?' (인원이 적어 그룹을 합침)':'')
+    + '. 역할 점수는 후보 풀 전체 기준입니다.</p>';
+}
+
+function renderRecruit(){
+  renderNeeds();
+  const list = candidatePool(), top = list.slice(0,15);
+  const [ka, kb] = ROLECOLS[S.role];
+  const onePos = groupsNow().length === 1;
+  $('#candTbl').classList.toggle('nopos', onePos);
+  $('#exclTbl').classList.toggle('nopos', onePos);
+  $('#colA').textContent = MLAB[ka]; $('#colB').textContent = MLAB[kb];
+  $('#candTitle').textContent = roleShort(S.role) + ' 후보';
+  $('#candHint').textContent = groupsNow().map(g=>POSNAME[g]).join('·') + ' ' + list.length + '명 중 상위 15명 · ' + S.mins + '분 이상' + (S.cross? ' · 상대 리그만':'');
+
+  // 데스크톱 표
   const body = $('#candBody'); body.innerHTML='';
   top.forEach((p,i)=>{
-    const tr = el('tr');
-    tr.innerHTML =
-      '<td class="rank num">'+(i+1)+'</td>'+
-      '<td><div class="pname">'+esc(p.n)+'</div><div class="psub">'+esc(p.t)+' · '+LGSHORT[p.l]+'</div></td>'+
-      '<td><span class="tag">'+POSNAME[p.p]+'</span></td>'+
-      '<td class="n">'+p.m+'′<div class="psub">'+p.gm+'경기</div></td>'+
-      '<td class="n">'+(p.g+p.a)+'<div class="psub">'+p.g+'G '+p.a+'A</div></td>'+
-      '<td class="n">'+f2(p[ka])+'</td>'+
-      '<td class="n">'+f2(p[kb])+'</td>'+
-      '<td><div class="score"><span class="b"><i style="width:'+p.r[S.role]+'%"></i></span><span class="num">'+f1(p.r[S.role])+'</span></div></td>';
-    const det = el('tr','detail');
-    const td = el('td'); td.colSpan = 8;
-    const extra = [];
-    if(p.rating!=null) extra.push('평점 <span class="num">'+f2(p.rating)+'</span>');
-    if(p.lbp90!=null) extra.push('라인 브레이킹 패스 <span class="num">'+f2(p.lbp90)+'</span>/90');
-    if(p.now) extra.push(D.meta.form_season+' 현재 '+p.now.m+'분 '+p.now.g+'골 '+p.now.a+'도움');
-    td.innerHTML = '<div class="pbars">' + PM.map(([k,lab])=>{
-      const v=p.pc[k];
-      return '<div class="pb"><span class="t">'+lab+'</span><span class="track"><i class="'+(v<50?'low':'')+'" style="width:'+v+'%"></i></span><span class="v">'+f1(v)+'</span></div>';
-    }).join('') + '</div>' +
-    '<p style="margin:12px 0 0;font-size:12.5px;color:var(--ink-2)">위 막대는 '+peerName(p.pg)+' 그룹 안에서의 백분위입니다'
-      + (p.pg.indexOf('+')>=0 ? ' (인원이 적어 그룹을 합쳤습니다)' : '')
-      + ' — 역할 점수는 포지션 구분 없이 후보 풀 전체 기준. 결정력 초과 <span class="num">'+(p.fin>=0?'+':'')+f2(p.fin)+'</span>골 (논페널티 득점 − npxG 근사)'
-      + (extra.length? ' · '+extra.join(' · '):'')+'</p>';
-    det.appendChild(td); det.style.display='none';
-    tr.addEventListener('click',()=>{
-      const open = det.style.display!=='none';
-      det.style.display = open? 'none':'table-row';
-      tr.classList.toggle('open', !open);
-    });
-    tr.tabIndex=0;
-    tr.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();tr.click();}});
+    const key = p.l+':'+p.id, isOpen = S.open===key;
+    const tr = el('tr','row'+(isOpen?' open':''));
+    tr.dataset.key = key; tr.tabIndex = 0; tr.setAttribute('aria-expanded', String(isOpen));
+    tr.innerHTML = '<td class="rk">'+(i+1)+'</td>'
+      + '<td><div class="pn">'+esc(p.n)+'</div><div class="pt">'+esc(p.t)+' · '+LGSHORT[p.l]+'</div></td>'
+      + '<td class="c-pos"><span class="tag">'+POSNAME[p.p]+'</span></td>'
+      + '<td class="n">'+p.m+'′</td>'
+      + '<td class="n">'+(p.g+p.a)+'</td>'
+      + '<td class="n">'+f2(p[ka])+'</td><td class="n">'+f2(p[kb])+'</td>'
+      + '<td class="n"><div class="score"><span class="t"><i style="width:'+p.r[S.role]+'%"></i></span><span class="num">'+f1(p.r[S.role])+'</span></div></td>';
+    const det = el('tr','det'); det.hidden = !isOpen;
+    const td = el('td'); td.colSpan = 8; td.innerHTML = detailHtml(p); det.appendChild(td);
+    const toggle = ()=>{ S.open = (S.open===key) ? null : key; const o = S.open===key;
+      det.hidden = !o; tr.classList.toggle('open', o); tr.setAttribute('aria-expanded', String(o)); };
+    tr.addEventListener('click', toggle);
+    tr.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle();}});
     body.appendChild(tr); body.appendChild(det);
   });
 
-  renderScatter(top, list);
+  // 모바일 카드 목록
+  const cards = $('#candCards'); cards.innerHTML='';
+  top.forEach((p,i)=>{
+    const key = p.l+':'+p.id, isOpen = S.open===key;
+    const li = el('li','card'+(isOpen?' open':''));
+    li.dataset.key = key; li.tabIndex = 0; li.setAttribute('aria-expanded', String(isOpen));
+    li.innerHTML = '<div class="card-top"><span class="rk">'+(i+1)+'</span>'
+      + '<div><div class="pn">'+esc(p.n)+'</div><div class="pt">'+esc(p.t)+' · '+LGSHORT[p.l]+(onePos?'':' · '+POSNAME[p.p])+'</div></div>'
+      + '<span class="sc">'+f1(p.r[S.role])+'</span></div>'
+      + '<div class="score"><span class="t"><i style="width:'+p.r[S.role]+'%"></i></span></div>'
+      + '<div class="card-kv"><span>'+MLAB[ka]+'<b>'+f2(p[ka])+'</b></span><span>'+MLAB[kb]+'<b>'+f2(p[kb])+'</b></span><span>'+p.m+'′</span></div>'
+      + '<div class="card-det"'+(isOpen?'':' hidden')+'>'+detailHtml(p)+'</div>';
+    const toggle = ()=>{ S.open = (S.open===key) ? null : key; const o = S.open===key;
+      li.querySelector('.card-det').hidden = !o; li.classList.toggle('open', o); li.setAttribute('aria-expanded', String(o)); };
+    li.addEventListener('click', toggle);
+    li.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle();}});
+    cards.appendChild(li);
+  });
+
   renderExcluded();
-  if(BT) renderBacktest();
+  renderScatter(top, list);
+  renderMerge();
+  renderStrip(list);
+  if(BT && !S.btRole) btScatter();
 }
 
-/* 출전 경기 부족으로 순위에서 빠진 선수 (data.json의 excluded) */
+function renderMerge(){
+  const mg = D.meta.groups_merged || [];
+  $('#mergeNote').innerHTML = mg.length
+    ? '<p class="warn"><b>포지션 그룹을 자동으로 합쳤습니다.</b> '
+      + mg.map(x=>esc(x.group)+' '+x.n+'명이 '+D.meta.min_group+'명 미만이라 '+esc(x.into)+'와 합쳐 '+esc(x.result)+' '+x.n_result+'명 기준으로 백분위를 계산했습니다').join(' · ')+'.</p>'
+    : '';
+}
+
 function renderExcluded(){
   const t = team(), groups = groupsNow(), all = D.excluded || [];
   const ex = all.filter(p=> groups.includes(p.p) && !(p.tid===t.id && p.l===S.lg) && !(S.cross && p.l===S.lg));
-  $('#exclN').textContent = ex.length + '명 (전체 ' + all.length + '명)';
-  $('#exclBody').innerHTML = ex.length ? ex.map(p=>'<tr style="cursor:default"><td><div class="pname">'+esc(p.n)+'</div><div class="psub">'+esc(p.t)+' · '+LGSHORT[p.l]+'</div></td>'
-    + '<td><span class="tag">'+POSNAME[p.p]+'</span></td><td class="n">'+p.m+'′</td><td class="n">'+p.gm+' / '+p.team_mp+'</td></tr>').join('')
-    : '<tr style="cursor:default"><td colspan="4">해당 선수 없음</td></tr>';
+  $('#exclN').innerHTML = '<span class="num">'+ex.length+'</span>명 (전체 <span class="num">'+all.length+'</span>명)';
+  $('#exclBody').innerHTML = ex.length ? ex.map(p=>'<tr><td><div class="pn">'+esc(p.n)+'</div><div class="pt">'+esc(p.t)+' · '+LGSHORT[p.l]+'</div></td>'
+    + '<td class="c-pos"><span class="tag">'+POSNAME[p.p]+'</span></td><td class="n">'+p.m+'′</td><td class="n">'+p.gm+' / '+p.team_mp+'</td></tr>').join('')
+    : '<tr><td colspan="4">해당 선수 없음</td></tr>';
 }
 
 function renderScatter(top, list){
-  const t = team();
+  const t = team(), groups = groupsNow();
   const [ka, kb] = ROLECOLS[S.role];
-  $('#scatterT').textContent = '후보 지형 · ' + MLAB[ka] + ' 대 ' + MLAB[kb];
-  const squad = D.players.filter(p=>p.tid===t.id && p.l===S.lg);
-  const others = list.slice(10);
-  const highlight = top.slice(0,10);
-  const all = list.concat(squad);
-  const W=400,H=290,ml=42,mr=14,mt=14,mb=36;
-  const mx = Math.max(0.05, ...all.map(p=>p[ka]))*1.08;
-  const my = Math.max(0.05, ...all.map(p=>p[kb]))*1.08;
+  $('#scatterT').textContent = MLAB[ka] + ' 대 ' + MLAB[kb];
+  // 현 스쿼드는 후보와 같은 포지션만 (다른 포지션과 같은 축에 놓으면 비교가 안 된다)
+  const squad = D.players.filter(p=>p.tid===t.id && p.l===S.lg && p.m>=S.mins && groups.includes(p.p));
+  const others = list.slice(10), highlight = top.slice(0,10), all = list.concat(squad);
+  const W=320,H=260,ml=40,mr=10,mt=10,mb=32;
+  const mx = Math.max(0.05, ...all.map(p=>p[ka]))*1.08, my = Math.max(0.05, ...all.map(p=>p[kb]))*1.08;
   const X = v=>ml+v/mx*(W-ml-mr), Y = v=>H-mb-v/my*(H-mt-mb);
   let g='';
   for(let i=0;i<=3;i++){
-    const v=mx*i/3; g+='<line x1="'+X(v)+'" y1="'+mt+'" x2="'+X(v)+'" y2="'+(H-mb)+'" stroke="var(--line)" stroke-width="1"/>';
-    g+='<text x="'+X(v)+'" y="'+(H-mb+15)+'" text-anchor="middle" font-size="10" fill="var(--ink-3)" font-family="IBM Plex Mono,monospace">'+f2(v)+'</text>';
+    const vx=mx*i/3, vy=my*i/3;
+    g+='<line x1="'+X(vx)+'" y1="'+mt+'" x2="'+X(vx)+'" y2="'+(H-mb)+'" stroke="var(--line)"/>';
+    g+='<text x="'+X(vx)+'" y="'+(H-mb+14)+'" text-anchor="middle" font-size="12" fill="var(--ink-3)" font-family="IBM Plex Mono,monospace">'+f1(vx)+'</text>';
+    g+='<line x1="'+ml+'" y1="'+Y(vy)+'" x2="'+(W-mr)+'" y2="'+Y(vy)+'" stroke="var(--line)"/>';
+    g+='<text x="'+(ml-6)+'" y="'+(Y(vy)+4)+'" text-anchor="end" font-size="12" fill="var(--ink-3)" font-family="IBM Plex Mono,monospace">'+f1(vy)+'</text>';
   }
-  for(let i=0;i<=3;i++){
-    const v=my*i/3; g+='<line x1="'+ml+'" y1="'+Y(v)+'" x2="'+(W-mr)+'" y2="'+Y(v)+'" stroke="var(--line)" stroke-width="1"/>';
-    g+='<text x="'+(ml-7)+'" y="'+(Y(v)+4)+'" text-anchor="end" font-size="10" fill="var(--ink-3)" font-family="IBM Plex Mono,monospace">'+f2(v)+'</text>';
-  }
-  g+='<text x="'+((ml+W-mr)/2)+'" y="'+(H-6)+'" text-anchor="middle" font-size="10.5" fill="var(--ink-3)">'+MLAB[ka]+'</text>';
-  g+='<text x="12" y="'+((mt+H-mb)/2)+'" text-anchor="middle" font-size="10.5" fill="var(--ink-3)" transform="rotate(-90 12 '+((mt+H-mb)/2)+')">'+MLAB[kb]+'</text>';
-
-  const dot=(p,fill,r,ring)=>'<circle cx="'+X(p[ka]).toFixed(1)+'" cy="'+Y(p[kb]).toFixed(1)+'" r="'+r+'" fill="'+fill+'"'+(ring?' stroke="var(--surface)" stroke-width="2"':'')+' data-n="'+encodeURIComponent(p.n)+'" data-t="'+encodeURIComponent(p.t)+'" data-x="'+f2(p[ka])+'" data-y="'+f2(p[kb])+'"/>';
-  others.forEach(p=>{g+=dot(p,'var(--ink-3)',3.2,false);});
-  squad.forEach(p=>{ if(p.m>=S.mins) g+=dot(p,'var(--s1)',5,true); });
-  highlight.forEach(p=>{g+=dot(p,'var(--s2)',5.5,true);});
-  const boxes=[];
-  const fits=(x0,y0,w,h)=> x0>ml-2 && x0+w<W-mr+2 && y0>mt && y0+h<H-mb &&
-      !boxes.some(b=> x0<b.x+b.w+3 && x0+w+3>b.x && y0<b.y+b.h+2 && y0+h+2>b.y);
-  highlight.slice(0,3).forEach(p=>{
-    const nm=p.n.split(' ').slice(-1)[0];
-    const w=nm.length*5.6+2, h=11, cx=X(p[ka]), cy=Y(p[kb]);
-    const opts=[[cx+9,cy-5.5],[cx-9-w,cy-5.5],[cx-w/2,cy-15],[cx-w/2,cy+7]];
-    for(const [ox,oy] of opts){
-      if(fits(ox,oy,w,h)){
-        boxes.push({x:ox,y:oy,w,h});
-        g+='<text x="'+ox.toFixed(1)+'" y="'+(oy+8.5).toFixed(1)+'" font-size="10.5" fill="var(--ink-2)" font-weight="600" paint-order="stroke" stroke="var(--surface)" stroke-width="3">'+esc(nm)+'</text>';
-        break;
-      }
-    }
-  });
+  const dot=(p,fill,r,tag)=>'<circle cx="'+X(p[ka]).toFixed(1)+'" cy="'+Y(p[kb]).toFixed(1)+'" r="'+r+'" fill="'+fill+'" data-g="'+tag+'" data-n="'+encodeURIComponent(p.n)+'" data-t="'+encodeURIComponent(p.t)+'" data-x="'+f2(p[ka])+'" data-y="'+f2(p[kb])+'"/>';
+  others.forEach(p=>{g+=dot(p,'var(--mid)',3,'rest');});
+  squad.forEach(p=>{g+=dot(p,'var(--squad)',4.5,'squad');});
+  highlight.forEach(p=>{g+=dot(p,'var(--accent)',4.5,'top');});
   const box=$('#scatter');
-  box.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="후보 선수 '+MLAB[ka]+' 대 '+MLAB[kb]+' 산점도">'+g+'</svg>';
+  box.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="후보 '+MLAB[ka]+' 대 '+MLAB[kb]+' 산점도">'+g+'</svg>';
   box.querySelectorAll('circle').forEach(c=>{
     c.addEventListener('mousemove',e=>showTip('<b>'+esc(decodeURIComponent(c.dataset.n))+'</b><br>'+esc(decodeURIComponent(c.dataset.t))+'<br>'+MLAB[ka]+' <span class="num">'+c.dataset.x+'</span> · '+MLAB[kb]+' <span class="num">'+c.dataset.y+'</span>',e.clientX,e.clientY));
     c.addEventListener('mouseleave',hideTip);
   });
 }
 
-/* ---- render all ---- */
-function render(){
-  renderTeam();
-  findings();
-  needs({t:team()});
-  renderCandidates();
-}
-
-/* ---- 6. 모델 검증 (backtest.json — 없으면 섹션을 숨긴 채 넘어간다) ---- */
-let BT = null;
-const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const f3 = n => (Math.round(n*1000)/1000).toFixed(3);
-
-function renderBacktest(){
-  if(!BT || !BT.pairs || !BT.pairs.length || !BT.meta || !BT.meta.roles) return;
-  $('#s-backtest').hidden = false;
+/* ===================== 모델 검증 (backtest.json — 없으면 판정 영역을 숨긴다) ===================== */
+function renderValidation(){
+  const ok = BT && BT.pairs && BT.pairs.length && BT.meta && BT.meta.roles;
+  $('#btNone').hidden = !!ok; $('#btMain').hidden = !ok;
+  if(!ok){ $('#btHint').textContent = ''; return; }
   const M = BT.meta, V = BT.verdict || {};
   $('#btHint').textContent = '완주 시즌 쌍 ' + M.pairs.join(' · ') + ' · 두 시즌 모두 후보 풀에 든 선수 · K는 시험 쌍을 뺀 쌍으로 추정';
 
-  // 판정문은 backtest.json에 검증 스크립트가 쓴 문장을 그대로 보여준다.
-  $('#btVerdict').innerHTML =
-    '<b>이 모델이 실제로 예측력이 있나.</b> N시즌 역할 점수로 N+1시즌을 맞혀 본 결과이고, 아래 판정문은 검증 스크립트가 쓴 문장 그대로입니다. '
-    + '빌드업·볼 탈취·박스 수비는 예측 대상이 자기 지표라 "원지표를 이기는가"가 성립하지 않아 다음 시즌에도 유지되는지(r)만 봅니다.'
-    + '<ul style="margin:8px 0 0;padding-left:18px">'
-    + Object.keys(M.roles).filter(k=>V[k]).map(k=>'<li><b>'+esc(M.roles[k].label)+'</b> — '+esc(V[k].text)+'</li>').join('')
-    + (V.attack ? '<li><b>참고</b> — '+esc(V.attack.text)+'</li>' : '')
-    + '</ul>';
+  // 판정문은 backtest.json에 검증 스크립트가 쓴 문장을 그대로 보여준다 (숫자 배열은 표에만).
+  $('#btVerdict').innerHTML = Object.keys(M.roles).filter(k=>V[k]).map(k=>
+      '<li><b>'+esc(M.roles[k].label.split(' (')[0])+'</b><span>'+esc(V[k].text)+'</span></li>').join('')
+    + (V.attack ? '<li class="ref"><b>참고 · 공격 생산</b><span>'+esc(V.attack.text)+'</span></li>' : '');
 
-  $('#btHead').innerHTML = '<th>역할 · 방법</th>' + M.pairs.map(p=>'<th class="n" style="text-align:right">'+esc(p)+' r</th>').join('');
-  const body = $('#btBody'); body.innerHTML='';
+  $('#btHead').innerHTML = '<th>역할 · 방법</th>' + M.pairs.map(p=>'<th>'+esc(p)+'</th>').join('');
+  let h = '';
   Object.keys(M.roles).forEach(rk=>{
     const tgt = M.targets[rk], retention = V[rk] && V[rk].kind==='retention';
-    const h = el('tr'); h.style.cursor='default';
-    h.innerHTML = '<td colspan="'+(1+M.pairs.length)+'" style="font-weight:600;background:var(--surface-2)">'+esc(M.roles[rk].label)
-      + ' <span class="psub">대상: '+esc(tgt.target)+' · n '+BT.pairs.map(p=>p.roles[rk].n).join(' / ')+'</span></td>';
-    body.appendChild(h);
+    h += '<tr class="rh"><td colspan="'+(1+M.pairs.length)+'">'+esc(M.roles[rk].label.split(' (')[0])
+      + '<span class="sub">대상: '+esc(tgt.target)+' · n '+BT.pairs.map(p=>p.roles[rk].n).join(' / ')+'</span></td></tr>';
     const single = Object.keys((D.role_weights||{})[rk]||{}).length===1;
     ['z_adj','pct_adj','prev'].forEach(k=>{
       if(retention && k==='prev') return;   // 대상이 자기 자신이라 '원지표 그대로' 비교가 성립하지 않는다
       if(single && k==='pct_adj') return;   // 지표가 하나면 이 줄은 '이전 모델'이 아니라 같은 지표의 백분위일 뿐이다
-      const tr = el('tr'); tr.style.cursor='default';
-      const lab = k==='prev' ? tgt.baseline+' 그대로' : M.labels[k];
-      tr.innerHTML = '<td'+(k==='z_adj'?' style="font-weight:600"':'')+'>'+esc(lab)+'</td>'
-        + BT.pairs.map(p=>{const c=p.roles[rk].methods[k].all; return '<td class="n" style="text-align:right">'+(c.r==null?'—':f3(c.r))+'</td>';}).join('');
-      body.appendChild(tr);
+      const lab = k==='prev' ? tgt.baseline+' 그대로' : k===M.deployed ? '현재 모델 (z-점수 가중합)' : '이전 모델 (백분위 가중합)';
+      h += '<tr><td class="mth'+(k===M.deployed?' dep':'')+'" title="'+esc(k==='prev' ? lab : M.labels[k])+'">'+esc(lab)+'</td>'
+        + BT.pairs.map(p=>{ const c = p.roles[rk].methods[k].all;
+            return '<td class="cell">'+pbar('', c.r==null ? null : c.r*100, {v: c.r==null ? '—' : f3(c.r)})+'</td>'; }).join('')
+        + '</tr>';
     });
   });
+  $('#btBody').innerHTML = h;
+
+  const sel = $('#btRole');
+  if(!sel.options.length) sel.innerHTML = Object.keys(M.roles).map(k=>'<option value="'+k+'">'+esc(M.roles[k].label.split(' (')[0])+'</option>').join('');
   btScatter();
 }
 
 function btScatter(){
-  const rk = S.role || 'finisher';
+  if(!BT || !BT.pairs || !BT.pairs.length) return;
+  const rk = S.btRole || S.role || 'finisher';
+  $('#btRole').value = rk;
   const pr = BT.pairs[BT.pairs.length-1], R = pr.roles[rk];
   const pts = (R && R.scatter) || [];
   const [from, to] = pr.pair.split('→');
-  $('#btScatterT').textContent = pr.pair + ' · ' + BT.meta.roles[rk].label + ' · r ' + (R ? f3(R.methods.z_adj.all.r) : '—');
+  $('#btScatterT').textContent = pr.pair + ' · r ' + (R ? f2(R.methods.z_adj.all.r) : '—');
   if(!pts.length){ $('#btScatter').innerHTML=''; return; }
-  const W=400,H=290,ml=44,mr=14,mt=14,mb=38;
+  const W=340,H=270,ml=46,mr=10,mt=10,mb=40;
   const xs=pts.map(d=>d.x), ys=pts.map(d=>d.y);
   let x0=Math.min(...xs), x1=Math.max(...xs), y0=Math.min(0,...ys), y1=Math.max(...ys);
   const px=(x1-x0)*0.05||1, py=(y1-y0)*0.06||1; x0-=px; x1+=px; y1+=py; if(y0<0) y0-=py;
   const X=v=>ml+(v-x0)/(x1-x0)*(W-ml-mr), Y=v=>H-mb-(v-y0)/(y1-y0)*(H-mt-mb);
+  const T = (x,y,s,a,extra)=>'<text x="'+x+'" y="'+y+'" text-anchor="'+a+'" font-size="12" fill="var(--ink-3)"'+(extra||'')+'>'+s+'</text>';
   let g='';
-  for(let i=0;i<=4;i++){
-    const v=x0+(x1-x0)*i/4; g+='<line x1="'+X(v)+'" y1="'+mt+'" x2="'+X(v)+'" y2="'+(H-mb)+'" stroke="var(--line)" stroke-width="1"/>';
-    g+='<text x="'+X(v)+'" y="'+(H-mb+15)+'" text-anchor="middle" font-size="10" fill="var(--ink-3)" font-family="IBM Plex Mono,monospace">'+f1(v)+'</text>';
+  for(let i=0;i<=3;i++){
+    const v=x0+(x1-x0)*i/3; g+='<line x1="'+X(v)+'" y1="'+mt+'" x2="'+X(v)+'" y2="'+(H-mb)+'" stroke="var(--line)"/>';
+    g+=T(X(v), H-mb+15, f1(v), 'middle', ' font-family="IBM Plex Mono,monospace"');
   }
   for(let i=0;i<=3;i++){
-    const v=y0+(y1-y0)*i/3; g+='<line x1="'+ml+'" y1="'+Y(v)+'" x2="'+(W-mr)+'" y2="'+Y(v)+'" stroke="var(--line)" stroke-width="1"/>';
-    g+='<text x="'+(ml-7)+'" y="'+(Y(v)+4)+'" text-anchor="end" font-size="10" fill="var(--ink-3)" font-family="IBM Plex Mono,monospace">'+f2(v)+'</text>';
+    const v=y0+(y1-y0)*i/3; g+='<line x1="'+ml+'" y1="'+Y(v)+'" x2="'+(W-mr)+'" y2="'+Y(v)+'" stroke="var(--line)"/>';
+    g+=T(ml-6, Y(v)+4, f2(v), 'end', ' font-family="IBM Plex Mono,monospace"');
   }
-  g+='<text x="'+((ml+W-mr)/2)+'" y="'+(H-6)+'" text-anchor="middle" font-size="10.5" fill="var(--ink-3)">'+esc(from)+' 역할 점수 (z 합성값)</text>';
-  g+='<text x="12" y="'+((mt+H-mb)/2)+'" text-anchor="middle" font-size="10.5" fill="var(--ink-3)" transform="rotate(-90 12 '+((mt+H-mb)/2)+')">'+esc(to)+' '+esc(BT.meta.targets[rk].target.replace('다음 시즌 ',''))+'</text>';
-  pts.forEach(d=>{ g+='<circle cx="'+X(d.x).toFixed(1)+'" cy="'+Y(d.y).toFixed(1)+'" r="3" fill="var(--s1)" opacity="0.45"/>'; });
+  g+=T((ml+W-mr)/2, H-4, esc(from)+' 역할 점수', 'middle');
+  pts.forEach(d=>{ g+='<circle cx="'+X(d.x).toFixed(1)+'" cy="'+Y(d.y).toFixed(1)+'" r="3" fill="var(--accent)" opacity="0.45"/>'; });
   const n=pts.length, sx=xs.reduce((a,v)=>a+v,0), sy=ys.reduce((a,v)=>a+v,0);
-  const sxy=pts.reduce((a,d)=>a+d.x*d.y,0), sxx=xs.reduce((a,v)=>a+v*v,0);
-  const den=n*sxx-sx*sx;
+  const sxy=pts.reduce((a,d)=>a+d.x*d.y,0), sxx=xs.reduce((a,v)=>a+v*v,0), den=n*sxx-sx*sx;
   if(den!==0){
-    const b=(n*sxy-sx*sy)/den, a=(sy-b*sx)/n;
-    const cl=v=>Math.min(y1,Math.max(y0,v));
-    g+='<line x1="'+X(x0)+'" y1="'+Y(cl(a+b*x0))+'" x2="'+X(x1)+'" y2="'+Y(cl(a+b*x1))+'" stroke="var(--s2)" stroke-width="2"/>';
+    const b=(n*sxy-sx*sy)/den, a=(sy-b*sx)/n, cl=v=>Math.min(y1,Math.max(y0,v));
+    g+='<line x1="'+X(x0)+'" y1="'+Y(cl(a+b*x0))+'" x2="'+X(x1)+'" y2="'+Y(cl(a+b*x1))+'" stroke="var(--ink-2)" stroke-width="1.5"/>';
   }
-  const boxes=[];
-  const fits=(bx,by,w,h)=> bx>ml-2 && bx+w<W-mr+2 && by>mt && by+h<H-mb &&
-      !boxes.some(q=> bx<q.x+q.w+3 && bx+w+3>q.x && by<q.y+q.h+2 && by+h+2>q.y);
-  pts.slice().sort((a,b)=>b.y-a.y).slice(0,5).forEach(d=>{
-    const nm=d.n.split(' ').slice(-1)[0];
-    const w=nm.length*5.6+2, h=11, cx=X(d.x), cy=Y(d.y);
-    const opts=[[cx+8,cy-5.5],[cx-8-w,cy-5.5],[cx-w/2,cy-14],[cx-w/2,cy+8]];
-    for(const [ox,oy] of opts){
-      if(fits(ox,oy,w,h)){
-        boxes.push({x:ox,y:oy,w:w,h:h});
-        g+='<text x="'+(ox+1)+'" y="'+(oy+9)+'" font-size="9.5" fill="var(--ink-2)">'+esc(nm)+'</text>';
-        break;
-      }
-    }
-  });
+  g+=T(ml+4, mt+12, esc(to)+' '+esc(BT.meta.targets[rk].target.replace('다음 시즌 ','')), 'start');
   $('#btScatter').innerHTML='<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="역할 점수 대 다음 시즌 값 산점도">'+g+'</svg>';
+}
+
+/* ---- render ---- */
+function render(){
+  const t = team();
+  NEED = computeNeeds(t);
+  if(!S.role){ S.role = NEED.order[0]; setPos(NEED.posHint[S.role] || 'ALL'); }
+  renderDiagnosis();
+  renderRecruit();
+}
+
+function initMeta(){
+  $('#m-upd').textContent = D.meta.generated;
+  $('#genline').textContent = '집계 기준일 ' + D.meta.generated + ' · 기준 시즌 ' + D.meta.season + ' · 후보 풀은 ' + D.meta.pool_rule
+    + '인 필드 플레이어 ' + D.players.length + '명입니다. 데이터는 매일 자동으로 다시 내려받습니다.';
+  $('#poolrule').textContent = D.meta.pool_rule;
+  $('#pooln').textContent = D.players.length;
+  const rw = D.role_weights || {};
+  $('#rolew').innerHTML = Object.keys(D.roles).map(k=>'<b>'+esc(roleShort(k))+'</b> = '
+    + Object.keys(rw[k]).map(m=>esc(MLAB[m]||m)+(Object.keys(rw[k]).length>1?' '+rw[k][m]:'')).join(' + ')
+    + ' (' + D.role_groups[k].map(g=>POSNAME[g]).join('·') + ')').join(', ');
+  const mg = D.meta.groups_merged || [];
+  if(mg.length){
+    $('#mergeMethod').hidden = false;
+    $('#mergeMethod').innerHTML = '<b>포지션 그룹 병합.</b> 그룹 인원이 '+D.meta.min_group+'명 미만이면 백분위가 거칠어져 이웃 그룹과 합쳐 계산합니다 — '
+      + mg.map(x=>esc(x.group)+' '+x.n+'명 + '+esc(x.into)+' '+x.n_into+'명 → '+esc(x.result)+' '+x.n_result+'명').join(' · ') + '.';
+  }
+  const sk = D.meta.shrink && D.meta.shrink.k;
+  if(sk){
+    const est = Object.keys(sk).filter(m=>sk[m].source==='estimated');
+    const parts = Object.keys(sk).map(m=>m.replace('90','')+' '+sk[m].K);
+    $('#shrinkline').innerHTML = 'K는 ' + (est.length
+      ? '완주한 연속 두 시즌 모두 후보 풀에 든 선수 ' + sk[est[0]].n + '명의 시즌간 상관계수에서 추정했습니다 (K ≈ 평균 출전분 × (1−r)/r)'
+      : '표본이 모자라 기본값을 썼습니다') + ' — <span class="num">' + parts.join(', ') + '</span>분.';
+  }
 }
 
 async function boot(){
@@ -841,19 +987,20 @@ async function boot(){
       D = await r.json();
     }
   }catch(e){
-    $('#boot').innerHTML = '<div class="note" style="border-color:var(--neg)"><b>데이터를 불러오지 못했습니다.</b> data.json이 index.html과 같은 폴더에 있는지 확인하세요. (' + e.message + ')</div>';
+    $('#boot').innerHTML = '<b>데이터를 불러오지 못했습니다.</b> data.json이 index.html과 같은 폴더에 있는지 확인하세요. (' + esc(e.message) + ')';
     return;
   }
   $('#boot').remove();
   initMeta();
   fillTeams();
+  setTab(location.hash.slice(1) || 'recruit', false);
   render();
   // 검증 결과는 선택적이다 — 인라인 payload 배포에는 backtest.json이 없다.
   try{
     const b = await fetch('backtest.json?t=' + Date.now(), {cache:'no-store'});
-    if(b.ok){ BT = await b.json(); renderBacktest(); }
-  }catch(e){ /* 섹션을 숨긴 채 넘어간다 */ }
-  addEventListener('resize',()=>{renderCandidates();});
+    if(b.ok){ BT = await b.json(); }
+  }catch(e){ /* 판정 영역은 숨긴 채 둔다 */ }
+  renderValidation();
 }
 boot();
 })();
