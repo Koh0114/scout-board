@@ -134,70 +134,86 @@ def beats(x, y):
     return all(a is not None and b is not None and a > b for a, b in zip(x, y))
 
 
+def _avg(xs):
+    xs = [x for x in xs if x is not None]
+    return sum(xs) / len(xs) if xs else None
+
+
+def _r2(x):
+    return "—" if x is None else f"{x:.2f}"
+
+
+def retention_word(r):
+    """'다음 시즌에도 유지되는가'를 말로. 경계값은 표현을 고르는 용도일 뿐 판정 기준이 아니다."""
+    if r is None:
+        return "판정 못 함"
+    return "잘 유지됨" if r >= 0.75 else "대체로 유지됨" if r >= 0.6 else "일부만 유지됨"
+
+
 def verdict(results):
-    """두 쌍 모두에서 이겨야 이긴 것으로 친다. 좋게 포장하지 않는다."""
+    """사람이 읽는 판정문을 만든다. 숫자는 두 시즌쌍 평균 r만 괄호로 쓰고, 쌍별 값은 표(structured
+    필드)에 둔다. '이겼다'는 쓰지 않는다 — 시즌쌍 2개로는 작은 차이를 우열로 읽을 수 없다."""
     out = {}
+    n_pairs = len(results)
     for rk in ROLES:
         d = {k: rs(results, rk, k) for k in results[0]["roles"][rk]["methods"]}
         rho = [p["roles"][rk]["methods"][DEPLOYED]["all"]["rho"] for p in results]
-        best = max(MODEL_KEYS, key=lambda k: sum(x or 0 for x in d[k]))
         retention = TARGET[rk][2] is None
         single = len(ROLES[rk]["w"]) == 1
-        lines = []
+        m_dep, m_prev = _avg(d[DEPLOYED]), _avg(d["prev"])
+        sents = []
         dep = None
         if retention:
-            # 대상이 자기 지표라 '원지표를 이기는가'는 성립하지 않는다. 유지되는지만 본다.
-            lines.append(f"다음 시즌에도 유지되는가: 현재 모델 r={d[DEPLOYED]}, rho={rho}")
+            sents.append(f"다음 시즌에도 {retention_word(m_dep)} (평균 r {_r2(m_dep)}).")
         else:
             dep = beats(d[DEPLOYED], d["prev"])
-            diff = [round(x - y, 3) for x, y in zip(d[DEPLOYED], d["prev"])]
+            diff = [x - y for x, y in zip(d[DEPLOYED], d["prev"])]
             base = TARGET[rk][1]
+            cmp_ = f"(평균 r {_r2(m_dep)} 대 {_r2(m_prev)})"
             if single:
-                head = f"원지표({base})와 같은 지표, 축소 효과만큼 높음"
+                sents.append(f"{base}과 같은 지표. 출전 시간 보정 덕분에 조금 더 정확함 {cmp_}.")
             elif all(abs(x) < SIMILAR for x in diff):
-                head = f"원지표({base})와 비슷한 수준"
+                sents.append(f"{base}을 그대로 쓰는 것과 비슷한 수준 {cmp_}.")
             elif all(x < 0 for x in diff):
-                head = f"원지표({base})보다 낮음"
+                sents.append(f"{base}을 그대로 쓰는 쪽이 더 정확함 {cmp_}.")
             else:
-                head = f"원지표({base})와 쌍마다 엇갈림"
-            lines.append(head + f" (현재 모델 r={d[DEPLOYED]}, 원지표 r={d['prev']}, 차이 {diff})")
+                sents.append(f"{base}과 시즌 쌍마다 엇갈림 {cmp_}.")
             mv_m, mv_p = rs(results, rk, DEPLOYED, "movers"), rs(results, rk, "prev", "movers")
             low = [p["pair"] for p, a_, b_ in zip(results, mv_m, mv_p)
                    if a_ is not None and b_ is not None and a_ < b_]
             if low and not single:
-                lines.append(f"이적 선수만 보면 {', '.join(low)}에서 원지표보다 낮다 "
-                             f"(모델 r={mv_m}, 원지표 r={mv_p})")
+                sents.append(f"팀을 옮긴 선수만 보면 {', '.join(low)}에서는 지난 시즌 값이 더 정확했음.")
         z_win, pct_win = beats(d["z_adj"], d["pct_adj"]), beats(d["pct_adj"], d["z_adj"])
-        if not single:
-            lines.append(("z-점수가 이전 모델(백분위 가중합)보다 두 쌍 모두 낫다" if z_win else
-                          "이전 모델(백분위 가중합)이 z-점수보다 두 쌍 모두 낫다" if pct_win else
-                          "z-점수와 백분위 가중합이 쌍마다 엇갈린다")
-                         + f" (z r={d['z_adj']}, 백분위 r={d['pct_adj']})")
+        if not single and z_win:
+            sents.append(f"이전 모델(백분위 가중합)보다 {n_pairs}개 시즌 쌍 모두에서 정확함.")
+        elif not single and pct_win:
+            sents.append(f"이전 모델(백분위 가중합)이 {n_pairs}개 시즌 쌍 모두에서 더 정확했음.")
         sh_p, sh_z = beats(d["pct_adj"], d["pct_raw"]), beats(d["z_adj"], d["z_raw"])
-        lines.append(f"축소: z {'도움' if sh_z else '도움 안 됨'} "
-                     f"(축소 r={d['z_adj']}, 미축소 r={d['z_raw']})")
+        if not single:
+            sents.append("출전 시간 보정은 " + ("모든 시즌 쌍에서 도움이 됨." if sh_z else "일관되게 도움이 되지는 않음."))
         v = dict(kind="retention" if retention else "prediction", deployed_r=d[DEPLOYED],
-                 deployed_rho=rho, deployed_beats_prev=dep, z_beats_pct=z_win, pct_beats_z=pct_win,
-                 shrink_helps_pct=sh_p, shrink_helps_z=sh_z, best_variant=best)
+                 deployed_rho=rho, prev_r=d["prev"], deployed_beats_prev=dep, z_beats_pct=z_win,
+                 pct_beats_z=pct_win, shrink_helps_pct=sh_p, shrink_helps_z=sh_z)
         if rk in POSS_ROLES:
             pz = beats(d["z_adj_poss"], d["z_adj"])
-            mv_p, mv_z = rs(results, rk, "z_adj_poss", "movers"), rs(results, rk, "z_adj", "movers")
-            pzm = None if None in mv_p + mv_z else beats(mv_p, mv_z)
+            mv_p_, mv_z_ = rs(results, rk, "z_adj_poss", "movers"), rs(results, rk, "z_adj", "movers")
+            pzm = None if None in mv_p_ + mv_z_ else beats(mv_p_, mv_z_)
             pt = beats(rs(results, rk, "z_adj_poss", block="methods_poss_target"),
                        rs(results, rk, "z_adj", block="methods_poss_target"))
-            mv_txt = "표본 30명 미만이라 판정 못 함" if pzm is None else ("개선" if pzm else "개선 없음")
-            lines.append(f"점유율 보정(z 기준): 원 대상 {'개선' if pz else '개선 없음'} · "
-                         f"이적 선수 {mv_txt} · 보정한 대상 {'개선' if pt else '개선 없음'}")
+            sents.append("팀 점유율 보정은 " + ("넣으면 더 정확해짐." if pz else "넣으면 오히려 덜 정확해져서 쓰지 않음.")
+                         + (" 팀을 옮긴 선수는 표본이 30명 미만이라 따로 판정하지 못함." if pzm is None else ""))
             v.update(poss_helps=pz, poss_helps_movers=pzm, poss_helps_poss_target=pt)
-        v["text"] = " · ".join(lines)
+        v["text"] = " ".join(sents)
         out[rk] = v
     att = [p["attack"]["methods"] for p in results]
     best = max((k for k in att[0] if k != "prev"), key=lambda k: sum(m[k]["r"] for m in att))
     win = all(m[best]["r"] > m["prev"]["r"] for m in att)
-    out["attack"] = dict(best=best, beats_prev=win, text=(
-        f"공격 종합(참고): 가장 나은 역할 점수({best})가 지난 시즌 (npxG+xA)/90 그대로를 "
-        + ("이겼다" if win else "못 이겼다")
-        + f" (역할 r={[m[best]['r'] for m in att]}, 원지표 r={[m['prev']['r'] for m in att]})"))
+    mb, mp = _avg([m[best]["r"] for m in att]), _avg([m["prev"]["r"] for m in att])
+    out["attack"] = dict(best=best, beats_prev=win, best_r=[m[best]["r"] for m in att],
+                         prev_r=[m["prev"]["r"] for m in att], text=(
+        "공격 생산 전체((npxG+xA)/90)는 "
+        + ("역할 점수가 지난 시즌 값보다 나은 쪽" if win else "지난 시즌 값을 그대로 쓰는 쪽이 더 정확함")
+        + f" (평균 r {_r2(mp)} 대 역할 점수 {_r2(mb)})."))
     return out
 
 

@@ -381,6 +381,8 @@ const LGSHORT = {EPL:'PL', La_liga:'라리가'};
 const POSNAME = {CB:'센터백', FB:'풀백·윙백', CM:'중앙 미드필더', AM:'공격형·측면', ST:'스트라이커'};
 const POS5 = ['CB','FB','CM','AM','ST'];
 const peerName = g => g.split('+').map(x=>POSNAME[x]).join('+');
+/* 받침에 맞는 조사: 받침이 없거나 ㄹ이면 '로', 그 밖의 받침이면 '으로' */
+const ro = w => { const c = w.charCodeAt(w.length-1) - 0xAC00; const j = (c>=0 && c<11172) ? c % 28 : 0; return w + (j===0 || j===8 ? '로' : '으로'); };
 
 /* ---- team metric dictionary (FotMob) ---- */
 const TM = [
@@ -463,7 +465,7 @@ function fillTeams(){
 $('#teamSel').addEventListener('change',e=>{S.team=e.target.value; S.role=null; render();});
 $('#minsRange').addEventListener('input',e=>{S.mins=+e.target.value; $('#minsOut').textContent=S.mins; renderCandidates();});
 $('#crossOnly').addEventListener('change',e=>{S.cross=e.target.checked; renderCandidates();});
-$('#posSel').addEventListener('change',e=>{S.pos=e.target.value; renderCandidates();});
+$('#posSel').addEventListener('change',e=>{S.pos=e.target.value; needs({t:team()}); renderCandidates();});
 
 const team = () => D.teams[S.lg].find(t=>t.name===S.team);
 
@@ -539,30 +541,44 @@ function renderTeam(){
 }
 
 /* ---- 2. findings ---- */
+/* 포지션 생산량 약점 → 그 약점을 메울 역할. findings와 needs가 같이 쓴다.
+   역할의 대상 그룹에 그 포지션이 들어 있는 조합만 둔다 (CM 득점 생산은 맞는 역할이 없다). */
+const POS_WEAK = [
+  {pos:'ST', m:'npxG90', role:'finisher', lab:'득점 생산', bad:'라인이 직접 만들어내는 슛 기대값이 리그 최하위권'},
+  {pos:'AM', m:'npxG90', role:'finisher', lab:'득점 생산', bad:'라인이 직접 만들어내는 슛 기대값이 리그 최하위권'},
+  {pos:'AM', m:'xA90',   role:'creator',  lab:'기회 제공', bad:'라인에서 나오는 결정적 패스가 리그 최하위권'},
+  {pos:'CM', m:'xA90',   role:'creator',  lab:'기회 제공', bad:'라인에서 나오는 결정적 패스가 리그 최하위권'},
+  {pos:'FB', m:'xA90',   role:'creator',  lab:'기회 제공', bad:'라인에서 나오는 결정적 패스가 리그 최하위권'}
+];
+const POS_WEAK_CUT = 45;   // 포지션 약점 카드를 띄우는 백분위 기준
+
+function posWeakItems(t){
+  return POS_WEAK.map(w=>Object.assign({}, w, {p:t.by_pos[w.pos].pct[w.m], label:POSNAME[w.pos]+' '+w.lab}));
+}
+
 function findings(){
   const t = team();
   const items = TM.map(m=>({m, p:t.pct[m.k]}));
-  const posItems = [];
-  ['ST','AM','CM'].forEach(pos=>posItems.push({label:POSNAME[pos]+' 득점 생산', p:t.by_pos[pos].pct.npxG90,
-    bad:POSNAME[pos]+' 라인이 직접 만들어내는 슛 기대값이 리그 최하위권'}));
-  ['AM','CM','FB'].forEach(pos=>posItems.push({label:POSNAME[pos]+' 기회 제공', p:t.by_pos[pos].pct.xA90,
-    bad:POSNAME[pos]+' 라인에서 나오는 결정적 패스가 리그 최하위권'}));
   const weak = items.slice().sort((a,b)=>a.p-b.p).filter(x=>x.p<50).slice(0,3);
   const strong = items.slice().sort((a,b)=>b.p-a.p).slice(0,2);
-  const weakPos = posItems.slice().sort((a,b)=>a.p-b.p)[0];
+  const posWeak = posWeakItems(t).filter(x=>x.p<POS_WEAK_CUT).sort((a,b)=>a.p-b.p);
+  const weakPos = posWeak[0];
 
   const rank = p => Math.max(1, Math.round(20 - p/100*20 + 0.5));
   const box = $('#findings'); box.innerHTML='';
+  const posLine = w => POSNAME[w.pos]+' '+w.bad+'. 백분위 <span class="rk">'+f1(w.p)+'</span>';
   if(!weak.length){
-    box.appendChild(el('div','find good','<h4>뚜렷한 약점 없음</h4><p>'+TM.length+'개 팀 지표가 모두 리그 중간값 이상입니다. 아래 보강안은 개선 여지가 가장 큰 쪽을 참고용으로 제시합니다.</p>'));
-  }
-  weak.forEach(w=>{
-    box.appendChild(el('div','find',
-      '<h4>'+w.m.label+'</h4><p>'+w.m.bad+'. 리그 <span class="rk">'+rank(w.p)+'위</span> / 20 · 백분위 <span class="rk">'+f1(w.p)+'</span> · 값 <span class="rk">'+w.m.val(t)+'</span> '+w.m.unit+'</p>'));
-  });
-  if(weakPos && weakPos.p < 45){
-    box.appendChild(el('div','find',
-      '<h4>'+weakPos.label+'</h4><p>'+weakPos.bad+'. 백분위 <span class="rk">'+f1(weakPos.p)+'</span></p>'));
+    // 팀 지표엔 약점이 없을 때: 포지션 약점이 있으면 한 장으로 합쳐 말한다 (두 카드가 서로 모순되지 않게)
+    box.appendChild(weakPos
+      ? el('div','find','<h4>팀 지표엔 약점 없음 · 포지션별로는 '+posWeak.length+'개</h4><p>'+TM.length+'개 팀 지표는 모두 리그 중간값 이상입니다. '
+          + '포지션별로는 <b>'+weakPos.label+'</b> — '+posLine(weakPos)+'</p>')
+      : el('div','find good','<h4>뚜렷한 약점 없음</h4><p>'+TM.length+'개 팀 지표와 포지션별 생산량이 모두 리그 중간값 근처 이상입니다. 아래 보강안은 참고용입니다.</p>'));
+  } else {
+    weak.forEach(w=>{
+      box.appendChild(el('div','find',
+        '<h4>'+w.m.label+'</h4><p>'+w.m.bad+'. 리그 <span class="rk">'+rank(w.p)+'위</span> / 20 · 백분위 <span class="rk">'+f1(w.p)+'</span> · 값 <span class="rk">'+w.m.val(t)+'</span> '+w.m.unit+'</p>'));
+    });
+    if(weakPos) box.appendChild(el('div','find','<h4>'+weakPos.label+'</h4><p>'+posLine(weakPos)+'</p>'));
   }
   strong.forEach(w=>{
     box.appendChild(el('div','find good',
@@ -573,45 +589,51 @@ function findings(){
 
 /* ---- 3. needs ---- */
 const ROLE_ORDER = ['finisher','creator','progressor','ballwinner','boxdef'];
+let POS_HINT = {};   // 역할 → 그 역할 점수를 가장 많이 보탠 포지션 (후보 필터 기본값)
+
+function setPos(v){ S.pos = v; $('#posSel').value = v; }
+
 function needs(diag){
   const t = diag.t || team();
-  const score = {}, why = {};
-  ROLE_ORDER.forEach(r=>{score[r]=0; why[r]=[];});
-  const add=(r,pts,txt)=>{score[r]+=pts; if(txt) why[r].push(txt);};
+  const score = {}, why = {}, posPts = {};
+  ROLE_ORDER.forEach(r=>{score[r]=0; why[r]=[]; posPts[r]={};});
+  const add=(r,pts,txt,pos)=>{score[r]+=pts; if(txt) why[r].push(txt); if(pos) posPts[r][pos]=(posPts[r][pos]||0)+pts;};
 
-  const p = t.pct, bp = t.by_pos;
+  const p = t.pct;
   if(p.xG90 < 50)      add('finisher', 50-p.xG90, '기회 창출 백분위 '+f1(p.xG90));
   if(p.finishing < 50) add('finisher', (50-p.finishing)*0.8, '결정력 백분위 '+f1(p.finishing));
-  if(bp.ST.pct.npxG90 < 50) add('finisher', (50-bp.ST.pct.npxG90)*1.1, '스트라이커 득점 생산 백분위 '+f1(bp.ST.pct.npxG90));
-
-  if(p.box90 < 50)       add('creator', 50-p.box90, '박스 침투 백분위 '+f1(p.box90));
-  if(bp.AM.pct.xA90 < 50) add('creator', 50-bp.AM.pct.xA90, '공격형·측면 기회 제공 백분위 '+f1(bp.AM.pct.xA90));
-  if(bp.CM.pct.xA90 < 50) add('creator', (50-bp.CM.pct.xA90)*0.6, '중앙 미드필더 기회 제공 백분위 '+f1(bp.CM.pct.xA90));
-
-  if(p.poss < 50)  add('progressor', (50-p.poss)*0.8, '점유 백분위 '+f1(p.poss));
-  if(p.box90 < 50) add('progressor', (50-p.box90)*0.4, null);
-
+  if(p.box90 < 50)     add('creator', 50-p.box90, '박스 침투 백분위 '+f1(p.box90));
+  if(p.poss < 50)      add('progressor', (50-p.poss)*0.8, '점유 백분위 '+f1(p.poss));
+  if(p.box90 < 50)     add('progressor', (50-p.box90)*0.4, null);
   if(p.press90 < 50)    add('ballwinner', 50-p.press90, '전방 압박 백분위 '+f1(p.press90));
   if(p.defact_adj < 50) add('ballwinner', (50-p.defact_adj)*0.8, '수비 활동량(점유 보정) 백분위 '+f1(p.defact_adj));
-
   if(p.xGA90 < 50)   add('boxdef', 50-p.xGA90, '기회 억제 백분위 '+f1(p.xGA90));
   if(p.keeping < 50) add('boxdef', (50-p.keeping)*0.4, '실점 억제 백분위 '+f1(p.keeping));
+  // 포지션 생산량 약점도 역할로 (DESIGN.md 0절 4번)
+  posWeakItems(t).forEach(w=>{ if(w.p < 50) add(w.role, (50-w.p)*1.1, w.label+' 백분위 '+f1(w.p), w.pos); });
+
+  POS_HINT = {};
+  ROLE_ORDER.forEach(r=>{
+    const ks = Object.keys(posPts[r]);
+    if(ks.length) POS_HINT[r] = ks.sort((a,b)=>posPts[r][b]-posPts[r][a])[0];
+  });
 
   const order = ROLE_ORDER.slice().sort((a,b)=>score[b]-score[a]);
-  if(!S.role) S.role = order[0];
+  if(!S.role){ S.role = order[0]; setPos(POS_HINT[S.role] || 'ALL'); }
 
   const box=$('#needs'); box.innerHTML='';
   order.forEach(r=>{
     const b=el('button','chip', D.roles[r] + (score[r]>0? ' <span class="bd">우선도 '+Math.round(score[r])+'</span>':''));
     b.setAttribute('aria-pressed', String(S.role===r));
-    b.addEventListener('click',()=>{S.role=r; needs({t}); renderCandidates();});
+    b.addEventListener('click',()=>{S.role=r; setPos(POS_HINT[r] || 'ALL'); needs({t}); renderCandidates();});
     box.appendChild(b);
   });
 
   const w = why[S.role] || [];
-  const grp = D.role_groups[S.role].map(g=>POSNAME[g]).join('·');
+  const grp = (S.pos!=='ALL' ? [S.pos] : D.role_groups[S.role]).map(g=>POSNAME[g]).join('·');
+  const posNote = (S.pos!=='ALL' && POS_HINT[S.role]===S.pos) ? ' 약점이 '+POSNAME[S.pos]+' 라인에 있어 포지션 필터를 '+ro(POSNAME[S.pos])+' 맞췄습니다.' : '';
   $('#needNote').innerHTML = w.length
-    ? '<div class="note"><b>'+D.roles[S.role]+'</b> 자원이 필요한 근거 — ' + w.join(' · ') + '. 아래 명단은 두 리그의 '+grp+' 중 이 역할 점수가 높은 순입니다.</div>'
+    ? '<div class="note"><b>'+D.roles[S.role]+'</b> 자원이 필요한 근거 — ' + w.join(' · ') + '.'+posNote+' 아래 명단은 두 리그의 '+grp+' 중 이 역할 점수가 높은 순입니다.</div>'
     : '<div class="note">이 역할은 현재 스쿼드의 뚜렷한 약점으로 잡히지 않았습니다. 참고용 명단으로 보세요 (대상: '+grp+').</div>';
 }
 
