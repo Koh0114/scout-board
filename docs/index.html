@@ -161,6 +161,21 @@ tr.det td{height:auto;padding:16px 16px 18px;background:var(--bg)}
 .nrow dd .num{font-weight:600}
 .pgroups{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px 24px;--pb-l:84px}
 .pgroup h4{font-size:12px;font-weight:600;color:var(--ink-3);margin:0 0 4px}
+/* 비슷한 선수 */
+.simw{margin-top:16px}
+.simw h4{font-size:12px;font-weight:600;color:var(--ink-3);margin:0 0 4px}
+.simw h4 span{font-weight:400}
+.sims{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 32px}
+.sims li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--line)}
+.sims .who{min-width:0;font-size:13px}
+.sims .simgo{appearance:none;border:0;background:none;padding:0;font:inherit;font-weight:600;color:var(--accent);cursor:pointer;text-align:left}
+.sims .simgo:hover{text-decoration:underline}
+.sims .nm{font-weight:600;color:var(--ink-2)}
+.sims .st{font-size:12px;color:var(--ink-3);margin-left:6px}
+.sims .sv{font-family:var(--f-num);font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink-2)}
+[data-key]{scroll-margin-top:120px}   /* 고정 상단 바(모바일은 두 줄)에 가리지 않게 */
+tr.gap td{height:28px;text-align:center;color:var(--ink-3);font-size:12px}
+li.gap{list-style:none;text-align:center;color:var(--ink-3);font-size:12px;margin:0 0 8px}
 
 /* ---------- 백분위 막대 (하나의 컴포넌트) ----------
    6px 트랙, 50에 눈금, 값은 오른쪽 mono. two=50 기준 양방향(팀), 아니면 0부터(선수). */
@@ -275,7 +290,7 @@ footer p{margin:0 0 8px;max-width:80ch}
   .pbar{grid-template-columns:minmax(0,1fr) 40px;grid-template-areas:"l v" "t t";row-gap:4px;min-height:0;margin-bottom:6px}
   .pbar .l{grid-area:l}.pbar .v{grid-area:v}.pbar .t{grid-area:t}
   .pbar.nl{grid-template-columns:minmax(0,1fr) 44px;grid-template-areas:"t v";margin-bottom:0}
-  .pgroups{grid-template-columns:minmax(0,1fr)}
+  .pgroups,.sims{grid-template-columns:minmax(0,1fr)}
   details.excl .tbl{overflow-x:auto}
   th{position:static}
   .blk{padding:14px}
@@ -546,6 +561,7 @@ const ROLE_ORDER = ['finisher','creator','progressor','ballwinner','boxdef'];
 const TABS = ['diagnosis','recruit','validation'];
 const S = {lg:'EPL', team:null, role:null, mins:600, cross:false, pos:'ALL', open:null, tab:'recruit', btRole:null};
 let NEED = null;   // computeNeeds 결과
+let PK = new Map();   // '리그:id' → 선수 (비슷한 선수 링크용)
 
 /* ---- 백분위 막대 (하나의 컴포넌트) ----
    o.two=true면 50 기준 양방향(팀 지표 — 50 미만만 빨강), 아니면 0부터 한 색(선수 백분위·검증 r).
@@ -760,21 +776,52 @@ function detailHtml(p){
   // 숫자 줄: 평점 · 이번 시즌 출전·골·도움 · 결정력 초과 (+ 라인 브레이킹 패스, 표시 전용)
   const kv = [];
   kv.push([D.meta.season+' 평점', p.rating!=null ? '<span class="num">'+f2(p.rating)+'</span>' : '—']);
-  kv.push([D.meta.form_season+' 현재', p.now
-    ? '<span class="num">'+p.now.m+'</span>분 · <span class="num">'+p.now.g+'</span>골 · <span class="num">'+p.now.a+'</span>도움'
-    : '90분 미만']);
+  const mga = (m,g,a)=>'<span class="num">'+m+'</span>분 · <span class="num">'+g+'</span>골 · <span class="num">'+a+'</span>도움';
+  if(D.meta.form_season === D.meta.season) kv.push([D.meta.season+' 시즌', mga(p.m, p.g, p.a)]);   // 새 시즌 파일이 아직 없을 때
+  else kv.push([D.meta.form_season+' 현재', p.now ? mga(p.now.m, p.now.g, p.now.a) : '90분 미만']);
   kv.push(['결정력 초과 (득점−npxG)', '<span class="num">'+sgn(p.fin, f2)+'</span>골']);
   if(p.lbp90!=null) kv.push(['라인 브레이킹 패스', '<span class="num">'+f2(p.lbp90)+'</span>/90']);
   return '<dl class="nrow">'+kv.map(([a,b])=>'<div><dt>'+esc(a)+'</dt><dd>'+b+'</dd></div>').join('')+'</dl>'
     + '<div class="pgroups">' + PGROUPS.map(([g, ms])=>'<div class="pgroup"><h4>'+g+'</h4>'
         + ms.map(([k,lab])=>pbar(lab, p.pc[k], {title:MLAB[k]+' '+f2(p[k])})).join('') + '</div>').join('') + '</div>'
+    + simHtml(p)
     + '<p class="det-note">막대는 '+esc(peerName(p.pg))+' 그룹 안 백분위입니다'+(p.pg.indexOf('+')>=0?' (인원이 적어 그룹을 합침)':'')
     + '. 역할 점수는 후보 풀 전체 기준입니다.</p>';
+}
+
+/* 비슷한 선수 8명 (build.py가 미리 계산: [id, 리그, 코사인 유사도]) */
+function simHtml(p){
+  if(!p.sim || !p.sim.length) return '';
+  const t = team();
+  return '<div class="simw"><h4>비슷한 선수 <span>· 같은 '+esc(peerName(p.pg))+' 그룹, 13개 지표 프로필의 코사인 유사도 (1에 가까울수록 비슷)</span></h4><ul class="sims">'
+    + p.sim.map(([id,l,s])=>{
+        const q = PK.get(l+':'+id); if(!q) return '';
+        const mine = q.tid===t.id && q.l===S.lg;   // 지금 보는 팀 선수는 후보 명단에 없다
+        return '<li><span class="who">'+(mine ? '<span class="nm">'+esc(q.n)+'</span>'
+            : '<button class="simgo" data-go="'+l+':'+id+'">'+esc(q.n)+'</button>')
+          + '<span class="st">'+esc(q.t)+' · '+LGSHORT[q.l]+(mine?' · 현 스쿼드':'')+'</span></span>'
+          + '<span class="sv">'+f2(s)+'</span></li>';
+      }).join('') + '</ul></div>';
+}
+
+/* 그 선수가 후보 명단에 보이도록 필터를 바꾸고 펼친다 */
+function goTo(key){
+  const q = PK.get(key); if(!q) return;
+  if(S.cross && q.l===S.lg){ S.cross=false; $('#crossOnly').checked=false; }
+  if(q.m < S.mins){ S.mins=D.meta.pool_min; $('#minsRange').value=S.mins; $('#minsOut').textContent=S.mins; }
+  if(!D.role_groups[S.role].includes(q.p)) S.role = NEED.order.find(r=>D.role_groups[r].includes(q.p));
+  setPos(q.p); S.open = key;
+  renderRecruit();
+  const target = [...document.querySelectorAll('[data-key="'+key+'"]')].find(e=>e.offsetParent);
+  if(target){ target.scrollIntoView({block:'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'}); target.focus({preventScroll:true}); }
 }
 
 function renderRecruit(){
   renderNeeds();
   const list = candidatePool(), top = list.slice(0,15);
+  const shown = top.map((p,i)=>[p,i]);
+  const oi = S.open ? list.findIndex(p=>p.l+':'+p.id===S.open) : -1;
+  if(oi >= 15) shown.push(null, [list[oi], oi]);   // null = '⋯' 줄
   const [ka, kb] = ROLECOLS[S.role];
   const onePos = groupsNow().length === 1;
   $('#candTbl').classList.toggle('nopos', onePos);
@@ -785,7 +832,9 @@ function renderRecruit(){
 
   // 데스크톱 표
   const body = $('#candBody'); body.innerHTML='';
-  top.forEach((p,i)=>{
+  shown.forEach(e=>{
+    if(!e){ const g = el('tr','gap'); g.innerHTML = '<td colspan="8">⋯</td>'; body.appendChild(g); return; }
+    const [p,i] = e;
     const key = p.l+':'+p.id, isOpen = S.open===key;
     const tr = el('tr','row'+(isOpen?' open':''));
     tr.dataset.key = key; tr.tabIndex = 0; tr.setAttribute('aria-expanded', String(isOpen));
@@ -807,7 +856,9 @@ function renderRecruit(){
 
   // 모바일 카드 목록
   const cards = $('#candCards'); cards.innerHTML='';
-  top.forEach((p,i)=>{
+  shown.forEach(e=>{
+    if(!e){ cards.appendChild(el('li','gap','⋯')); return; }
+    const [p,i] = e;
     const key = p.l+':'+p.id, isOpen = S.open===key;
     const li = el('li','card'+(isOpen?' open':''));
     li.dataset.key = key; li.tabIndex = 0; li.setAttribute('aria-expanded', String(isOpen));
@@ -819,11 +870,12 @@ function renderRecruit(){
       + '<div class="card-det"'+(isOpen?'':' hidden')+'>'+detailHtml(p)+'</div>';
     const toggle = ()=>{ S.open = (S.open===key) ? null : key; const o = S.open===key;
       li.querySelector('.card-det').hidden = !o; li.classList.toggle('open', o); li.setAttribute('aria-expanded', String(o)); };
-    li.addEventListener('click', toggle);
+    li.addEventListener('click', e=>{ if(!e.target.closest('.card-det')) toggle(); });
     li.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle();}});
     cards.appendChild(li);
   });
 
+  document.querySelectorAll('#p-recruit .simgo').forEach(b=>b.addEventListener('click', e=>{ e.stopPropagation(); goTo(b.dataset.go); }));
   renderExcluded();
   renderScatter(top, list);
   renderMerge();
@@ -963,7 +1015,8 @@ function render(){
 function initMeta(){
   $('#m-upd').textContent = D.meta.generated;
   $('#genline').textContent = '집계 기준일 ' + D.meta.generated + ' · 기준 시즌 ' + D.meta.season + ' · 후보 풀은 ' + D.meta.pool_rule
-    + '인 필드 플레이어 ' + D.players.length + '명입니다. 데이터는 매일 자동으로 다시 내려받습니다.';
+    + '인 필드 플레이어 ' + D.players.length + '명입니다. 데이터는 매일 자동으로 다시 내려받습니다.'
+    + (D.meta.season_note ? ' ' + D.meta.season_note : '');
   $('#poolrule').textContent = D.meta.pool_rule;
   $('#pooln').textContent = D.players.length;
   const rw = D.role_weights || {};
@@ -1001,6 +1054,7 @@ async function boot(){
     return;
   }
   $('#boot').remove();
+  PK = new Map(D.players.map(p=>[p.l+':'+p.id, p]));
   initMeta();
   fillTeams();
   setTab(location.hash.slice(1) || 'recruit', false);

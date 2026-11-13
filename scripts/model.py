@@ -430,6 +430,38 @@ def score_pool(pool, suffix="_adj"):
     return pool
 
 
+SIM_N = 8                 # 선수당 "비슷한 선수" 수
+
+
+def similar_players(pool, n=SIM_N, suffix="_adj"):
+    """같은 포지션 그룹(peer, 합쳤으면 합친 그룹) 안에서 축소된 13개 지표를 그룹 안 z-점수로
+    바꾼 벡터의 코사인 유사도. 같은 팀(같은 리그·같은 팀 ID) 선수와 자기 자신은 뺀다.
+    반환: {(league, id): [(상대 선수 행, 유사도), ...]} 유사도 높은 순 n명."""
+    out = {}
+    for lab in peer_labels(pool):
+        grp = [p for p in pool if p["peer"] == lab]
+        stats = {}
+        for m in PLAYER_METRICS:
+            vals = [p[m + suffix] for p in grp]
+            mu = sum(vals) / len(vals)
+            stats[m] = (mu, (sum((v - mu) ** 2 for v in vals) / len(vals)) ** 0.5 or 1.0)
+        vec = {id(p): [(p[m + suffix] - stats[m][0]) / stats[m][1] for m in PLAYER_METRICS] for p in grp}
+        norm = {k: sum(x * x for x in v) ** 0.5 or 1.0 for k, v in vec.items()}
+        for p in grp:
+            a = vec[id(p)]
+            cands = []
+            for q in grp:
+                if q is p or q["id"] == p["id"]:
+                    continue
+                if q["team_id"] == p["team_id"] and q["league"] == p["league"]:
+                    continue
+                b = vec[id(q)]
+                cands.append((q, sum(x * y for x, y in zip(a, b)) / (norm[id(p)] * norm[id(q)])))
+            cands.sort(key=lambda t: -t[1])
+            out[(p["league"], p["id"])] = cands[:n]
+    return out
+
+
 def build_pool(raw, yr, K=None, poss_adj=False):
     """그 시즌의 후보 풀을 만들고 그룹 병합·축소·백분위·역할 점수까지 매긴다.
     K를 주지 않으면 축소 없이(원값 기준) 점수를 매긴다.
