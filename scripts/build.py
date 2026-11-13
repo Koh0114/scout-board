@@ -9,8 +9,9 @@ import json, os, sys
 from datetime import timezone, datetime, timedelta
 
 from model import (LEAGUES, POOL_MIN, PLAYER_METRICS, DISPLAY_METRICS, ROLES, POS_GROUPS,
-                   PK_XG, season_label, pct_rank, played, season_block,
-                   player_rows, estimate_k, prior_means, apply_shrinkage, score_pool)
+                   PK_XG, MIN_GROUP, season_label, pct_rank, played, season_block,
+                   player_rows, pool_rows, excluded_rows, merge_groups, peer_labels,
+                   estimate_k, prior_means, apply_shrinkage, score_pool)
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 RAW = os.path.join(ROOT, "data", "fotmob_raw.json")
@@ -120,10 +121,19 @@ for lg, tt in teams.items():
             p = pct_rank(vals, t[m])
             t.setdefault("pct", {})[m] = round(p if higher else 100 - p, 1)
 
-pool = [p for p in players if p["mins"] >= POOL_MIN and p["pos"] in POS_GROUPS]
-bad = [(p["name"], m) for p in pool for m in PLAYER_METRICS if p[m] is None]
-if bad:
-    sys.exit(f"후보 풀에 결측 지표: {bad[:10]}")
+# 후보 풀 = POOL_MIN분 이상 + 팀 경기 절반 이상 출전. 분은 넘었지만 경기가 모자란
+# 선수는 per-90 지표가 없어 순위에서 빠진다 — 목록만 data.json에 남긴다.
+pool = pool_rows(d, SEASON, rows=players)
+excluded = excluded_rows(players)
+print(f"후보 풀 {len(pool)}명 · 출전 경기 부족으로 제외 {len(excluded)}명")
+
+# 그룹 인원이 MIN_GROUP 미만이면 자동으로 합친다 (사전평균·그룹 백분위에 쓰는 그룹).
+MERGES = merge_groups(pool)
+counts = {lab: sum(1 for p in pool if p["peer"] == lab) for lab in peer_labels(pool)}
+print(f"그룹 인원 {counts}")
+for mg in MERGES:
+    print(f"  ! {mg['group']} {mg['n']}명 < {MIN_GROUP} → {mg['into']}({mg['n_into']}명)과 합침 "
+          f"→ {mg['result']} {mg['n_result']}명")
 
 # per-90 계산 직후 · 백분위 계산 전에 축소를 적용한다.
 # 백분위(pct/pctA)와 역할 점수는 전부 축소값 기준, 원값은 표시용으로 남는다.
@@ -162,7 +172,7 @@ def rnd(x, k=3):
 
 
 def slim(p):
-    o = dict(id=p["id"], n=p["name"], t=p["team"], l=p["league"], p=p["pos"],
+    o = dict(id=p["id"], n=p["name"], t=p["team"], l=p["league"], p=p["pos"], pg=p["peer"],
              pc_codes=p["pos_codes"], m=p["mins"], gm=p["games"], g=p["g"], pk=p["pkg"],
              a=p["a"], xG=rnd(p["xG"], 2), fin=round(p["fin"], 2))
     for k in PLAYER_METRICS:
@@ -186,11 +196,18 @@ out = dict(
               form_season=season_label(FORM), leagues=LEAGUES, pool_min=POOL_MIN,
               generated=datetime.now(KST).strftime("%Y-%m-%d %H:%M KST"),
               pos_groups=list(POS_GROUPS),
+              # pc(그룹 백분위)와 축소 사전평균은 peer_groups 기준. 합쳤으면 groups_merged에 기록
+              peer_groups=counts, min_group=MIN_GROUP, groups_merged=MERGES,
+              pool_rule=f"{POOL_MIN}분 이상 + 팀 경기 절반 이상 출전",
               npxg_note=f"npxG = xG − {PK_XG} × PK골 (근사, 실축 PK는 빼지 못함)",
               shrink=dict(k=K_INFO, prior={g: {m: round(v, 3) for m, v in pr.items()}
                                            for g, pr in PRIOR.items()})),
     teams={lg: list(tt.values()) for lg, tt in teams.items()},
     players=[slim(p) for p in pool],
+    # 7단계: 사이트에서 "출전 경기 부족으로 순위 제외"로 따로 보여준다
+    excluded=[dict(id=p["id"], n=p["name"], t=p["team"], l=p["league"], p=p["pos"],
+                   m=p["mins"], gm=p["games"], team_mp=p["team_mp"])
+              for p in sorted(excluded, key=lambda p: -p["mins"])],
     roles={k: v["label"] for k, v in ROLES.items()},
     role_groups={k: v["groups"] for k, v in ROLES.items()},
 )
