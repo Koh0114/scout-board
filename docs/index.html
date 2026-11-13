@@ -224,6 +224,7 @@ details.excl p{font-size:13px;color:var(--ink-3);margin:4px 0 12px}
 .dmeta{display:flex;flex-wrap:wrap;gap:6px 20px;font-size:13px;color:var(--ink-3);margin:16px 0 0}
 .dmeta b{font-family:var(--f-num);font-weight:600;color:var(--ink-2)}
 .fmw{display:inline-flex;gap:3px;vertical-align:1px}
+.fml{font-size:12px;color:var(--ink-3)}
 .fmw span{font-family:var(--f-num);font-size:12px;width:18px;height:18px;line-height:18px;text-align:center;border-radius:4px;background:var(--surface-2);color:var(--ink-2)}
 
 /* ---------- 모델 검증 ---------- */
@@ -497,8 +498,6 @@ const peerName = g => g.split('+').map(x=>POSNAME[x]).join('+');
 /* 받침에 맞는 조사: 받침이 없거나 ㄹ이면 '로', 그 밖의 받침이면 '으로' */
 const ro = w => { const c = w.charCodeAt(w.length-1) - 0xAC00; const j = (c>=0 && c<11172) ? c % 28 : 0; return w + (j===0 || j===8 ? '로' : '으로'); };
 const roleShort = k => D.roles[k].split(' (')[0];
-/* 백분위 → 사람이 읽는 말. 15.0 → "리그 하위 15%", 92.5 → "리그 상위 8%" */
-const rel = p => p < 50 ? '리그 하위 '+Math.max(1, Math.round(p))+'%' : p > 50 ? '리그 상위 '+Math.max(1, Math.round(100-p))+'%' : '리그 중간';
 
 const MLAB = {npxG90:'npxG/90', xA90:'xA/90', sh90:'슈팅/90', drib90:'드리블/90', chances90:'기회 창출/90', bigch90:'빅찬스/90',
   pass90:'성공 패스/90', long90:'성공 롱볼/90', tkl90:'태클/90', int90:'인터셉트/90', rec90:'리커버리/90', clr90:'클리어/90', blk90:'블록/90'};
@@ -627,17 +626,20 @@ function computeNeeds(t){
   const score = {}, why = {}, posPts = {};
   ROLE_ORDER.forEach(r=>{score[r]=0; why[r]=[]; posPts[r]={};});
   const add=(r,pts,txt,pos)=>{score[r]+=pts; if(txt) why[r].push({txt, pts}); if(pos) posPts[r][pos]=(posPts[r][pos]||0)+pts;};
-  const p = t.pct;
-  if(p.xG90 < 50)      add('finisher', 50-p.xG90, '기회 창출 '+rel(p.xG90));
-  if(p.finishing < 50) add('finisher', (50-p.finishing)*0.8, '결정력 '+rel(p.finishing));
-  if(p.box90 < 50)     add('creator', 50-p.box90, '박스 침투 '+rel(p.box90));
-  if(p.poss < 50)      add('progressor', (50-p.poss)*0.8, '점유 '+rel(p.poss));
+  const p = t.pct, all = D.teams[S.lg];
+  /* 팀 단위 근거는 백분위 대신 리그 순위로 말한다 */
+  const tr = k => '리그 '+rankOf(p[k], all.map(x=>x.pct[k]))+'위 / '+all.length;
+  const trPos = w => '리그 '+rankOf(w.p, all.map(x=>x.by_pos[w.pos].pct[w.m]))+'위 / '+all.length;
+  if(p.xG90 < 50)      add('finisher', 50-p.xG90, '기회 창출 '+tr('xG90'));
+  if(p.finishing < 50) add('finisher', (50-p.finishing)*0.8, '결정력 '+tr('finishing'));
+  if(p.box90 < 50)     add('creator', 50-p.box90, '박스 침투 '+tr('box90'));
+  if(p.poss < 50)      add('progressor', (50-p.poss)*0.8, '점유 '+tr('poss'));
   if(p.box90 < 50)     add('progressor', (50-p.box90)*0.4, null);
-  if(p.press90 < 50)    add('ballwinner', 50-p.press90, '전방 압박 '+rel(p.press90));
-  if(p.defact_adj < 50) add('ballwinner', (50-p.defact_adj)*0.8, '수비 활동량(점유 보정) '+rel(p.defact_adj));
-  if(p.xGA90 < 50)   add('boxdef', 50-p.xGA90, '기회 억제 '+rel(p.xGA90));
-  if(p.keeping < 50) add('boxdef', (50-p.keeping)*0.4, '실점 억제 '+rel(p.keeping));
-  posWeakItems(t).forEach(w=>{ if(w.p < 50) add(w.role, (50-w.p)*1.1, w.label+' '+rel(w.p), w.pos); });
+  if(p.press90 < 50)    add('ballwinner', 50-p.press90, '전방 압박 '+tr('press90'));
+  if(p.defact_adj < 50) add('ballwinner', (50-p.defact_adj)*0.8, '수비 활동량(점유 보정) '+tr('defact_adj'));
+  if(p.xGA90 < 50)   add('boxdef', 50-p.xGA90, '기회 억제 '+tr('xGA90'));
+  if(p.keeping < 50) add('boxdef', (50-p.keeping)*0.4, '실점 억제 '+tr('keeping'));
+  posWeakItems(t).forEach(w=>{ if(w.p < 50) add(w.role, (50-w.p)*1.1, w.label+' '+trPos(w), w.pos); });
   const posHint = {};
   ROLE_ORDER.forEach(r=>{ const ks=Object.keys(posPts[r]); if(ks.length) posHint[r]=ks.sort((a,b)=>posPts[r][b]-posPts[r][a])[0]; });
   ROLE_ORDER.forEach(r=>why[r].sort((a,b)=>b.pts-a.pts));
@@ -701,7 +703,7 @@ function renderDiagnosis(){
   const li = (cls, k, body) => '<li><span class="k '+cls+'">'+k+'</span><div>'+body+'</div></li>';
   const fm = s => ' <span class="fm">'+s+'</span>';
   const posBody = w => '<b>'+esc(w.label)+'</b> — '+esc(w.bad)+'.'
-    + fm('리그 '+rankOf(w.p, all.map(x=>x.by_pos[w.pos].pct[w.m]))+'위 / '+n+' · '+rel(w.p));
+    + fm('리그 '+rankOf(w.p, all.map(x=>x.by_pos[w.pos].pct[w.m]))+'위 / '+n);
   let h = '';
   if(!weak.length){
     h += wp
@@ -710,29 +712,29 @@ function renderDiagnosis(){
       : li('', '약점', '<b>뚜렷한 약점 없음</b> — '+TM.length+'개 팀 지표와 포지션별 생산량이 모두 리그 중간 근처 이상입니다. 영입 후보는 참고용입니다.');
   } else {
     weak.forEach(w=>{ h += li('neg','약점', '<b>'+esc(w.m.label)+'</b> — '+esc(w.m.bad)+'.'
-      + fm('리그 '+w.rk+'위 / '+n+' · '+rel(w.p)+' · '+withUnit(w.m.val(t), w.m.unit))); });
+      + fm('리그 '+w.rk+'위 / '+n+' · '+withUnit(w.m.val(t), w.m.unit))); });
     if(wp) h += li('neg','약점', posBody(wp));
   }
   strong.forEach(w=>{ h += li('pos','강점', '<b>'+esc(w.m.label)+'</b> — '+esc(w.m.good)+'.'
-    + fm('리그 '+w.rk+'위 / '+n+' · '+rel(w.p)+' · '+withUnit(w.m.val(t), w.m.unit))); });
+    + fm('리그 '+w.rk+'위 / '+n+' · '+withUnit(w.m.val(t), w.m.unit))); });
   $('#finds').innerHTML = h;
 
   // 부수 정보: 득실 · 최근 6경기 · 현재 시즌
   const fn = t.form_now;
   $('#dg-meta').innerHTML =
       '<span>득실 <b>'+t.gf+'−'+t.ga+'</b> (경기당 '+f2(t.gf90)+'−'+f2(t.ga90)+')</span>'
-    + '<span>'+esc(D.meta.season)+' 마지막 6경기 <span class="fmw">'+t.form.map(r=>'<span title="'+({w:'승',d:'무',l:'패'}[r])+'">'+({w:'W',d:'D',l:'L'}[r])+'</span>').join('')+'</span></span>'
+    + '<span>'+esc(D.meta.season)+' 마지막 6경기 <span class="fmw">'+t.form.map(r=>'<span title="'+({w:'승',d:'무',l:'패'}[r])+'">'+({w:'W',d:'D',l:'L'}[r])+'</span>').join('')+'</span> <span class="fml">→ 최근</span></span>'
     + (fn ? '<span>'+esc(D.meta.form_season)+' 현재 <b>'+fn.mp+'</b>경기 <b>'+fn.pts+'</b>점 · 경기당 xG 차이 <b>'+sgn(fn.xGD90, f2)+'</b></span>' : '');
 
   $('#tmBars').innerHTML = TM.map(m=>pbar(m.label, t.pct[m.k], {two:true, sub:withUnit(m.val(t), m.unit),
-    title:m.label+' — '+rel(t.pct[m.k])+' (백분위 '+f1(t.pct[m.k])+')'})).join('');
+    title:m.label+' — 리그 '+rankOf(t.pct[m.k], all.map(x=>x.pct[m.k]))+'위 / '+n+' (백분위 '+f1(t.pct[m.k])+')'})).join('');
 
   $('#posBars').innerHTML = POS5.map(pos=>{
     const bp = t.by_pos[pos];
     return '<div class="grp-h">'+POSNAME[pos]+' <span class="num">'+bp.n+'</span>명</div>'
       + [['npxG90','득점 생산','npxG'],['xA90','기회 제공','xA']].map(([mk,lab,u])=>
         pbar(lab, bp.pct[mk], {two:true, sub:f2(bp[mk])+' '+u+'/90',
-          title:POSNAME[pos]+' '+lab+' — '+rel(bp.pct[mk])+' (백분위 '+f1(bp.pct[mk])+')'})).join('');
+          title:POSNAME[pos]+' '+lab+' — 리그 '+rankOf(bp.pct[mk], all.map(x=>x.by_pos[pos].pct[mk]))+'위 / '+n+' (백분위 '+f1(bp.pct[mk])+')'})).join('');
   }).join('');
 }
 
