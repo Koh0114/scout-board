@@ -610,3 +610,59 @@ def wcos(a, b, w):
     na = sum(wi * x * x for wi, x in zip(w, a)) ** 0.5
     nb = sum(wi * y * y for wi, y in zip(w, b)) ** 0.5
     return num / (na * nb) if na and nb else None
+
+
+# ------------------------------------------------------------------ 리그 강도 (ROADMAP C)
+# 리그 간 이적자의 변화 − 대조군(출발 리그에 남은 같은 포지션·같은 시즌쌍 선수) 평균 변화 = 차이의 차이.
+# 라리가→PL은 부호를 뒤집어 "라리가 대비 PL 난이도" 계수 하나로 묶는다 (양수 = PL이 더 어렵다).
+# 보정은 자동으로 켜지 않는다 — 추정치와 신뢰구간만 기록한다 (켤지는 사람이 정한다, CLAUDE.md).
+LEAGUE_MIN_N = 15         # 이적자가 이보다 적으면 추정 자체를 끈다
+LEAGUE_BOOT = 2000
+LEAGUE_SEED = 20261114    # 데이터가 같으면 숫자도 같게
+
+
+def league_effect(raw, years, K):
+    import random
+    done = [y for y in years if completed(raw, y)]
+    pairs = [(y, y + 1) for y in done if y + 1 in done]
+    pools = {y: {p["id"]: p for p in build_pool(raw, y, K)} for y in {y for pr in pairs for y in pr}}
+
+    def role_avg(p, pos):
+        rs = [r for r, R in ROLES.items() if pos in R["groups"]]
+        return sum(p["role_z"][r] for r in rs) / len(rs)
+
+    movers, ctrl = [], []
+    for y1, y2 in pairs:
+        for pid, a in pools[y1].items():
+            b = pools[y2].get(pid)
+            if not b:
+                continue
+            row = dict(fr=a["league"], key=(a["league"], a["pos"], y1),
+                       d={"npxG90": b["npxG90_adj"] - a["npxG90_adj"], "xA90": b["xA90_adj"] - a["xA90_adj"],
+                          "role_z": role_avg(b, a["pos"]) - role_avg(a, a["pos"])})
+            (movers if a["league"] != b["league"] else ctrl).append(row)
+    first = list(LEAGUES)[0]                       # EPL
+    out = dict(n=len(movers), n_pl_ll=sum(1 for r in movers if r["fr"] == first),
+               n_ll_pl=sum(1 for r in movers if r["fr"] != first), n_ctrl=len(ctrl),
+               pairs=[f"{season_label(a)}→{season_label(b)}" for a, b in pairs],
+               min_n=LEAGUE_MIN_N, boot=LEAGUE_BOOT, metrics={}, applied=False)
+    if len(movers) < LEAGUE_MIN_N:
+        out["off"] = True
+        return out
+
+    def est(mv, ct, m):
+        cm = {}
+        for r in ct:
+            cm.setdefault(r["key"], []).append(r["d"][m])
+        cm = {k: sum(v) / len(v) for k, v in cm.items()}
+        x = [(r["d"][m] - cm[r["key"]]) * (1 if r["fr"] == first else -1) for r in mv if r["key"] in cm]
+        return sum(x) / len(x) if x else 0.0
+
+    rnd = random.Random(LEAGUE_SEED)
+    for m in ("npxG90", "xA90", "role_z"):
+        bs = sorted(est([rnd.choice(movers) for _ in movers], [rnd.choice(ctrl) for _ in ctrl], m)
+                    for _ in range(LEAGUE_BOOT))
+        lo, hi = bs[int(0.025 * LEAGUE_BOOT)], bs[int(0.975 * LEAGUE_BOOT) - 1]
+        out["metrics"][m] = dict(est=round(est(movers, ctrl, m), 4), lo=round(lo, 4), hi=round(hi, 4),
+                                 excludes_zero=not (lo <= 0 <= hi))
+    return out

@@ -14,7 +14,7 @@ from model import (LEAGUES, POOL_MIN, PLAYER_METRICS, DISPLAY_METRICS, ROLES, PO
                    estimate_k, prior_means, apply_shrinkage, score_pool,
                    similar_players, sim_weights, SIM_N,
                    STYLE, team_styles, style_metric, style_euclid, style_neighbors, z_stats,
-                   completed, pearson)
+                   completed, pearson, league_effect)
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 RAW = os.path.join(ROOT, "data", "fotmob_raw.json")
@@ -55,6 +55,19 @@ if f"{list(LEAGUES)[0]}_{SEASON}" not in d:
 
 
 K_VALUES, K_INFO = estimate_k(d, years, log=print)
+
+# 리그 강도 (ROADMAP C): 매번 다시 추정하지만 보정은 켜지 않는다. 구간이 0을 벗어나면 경고만 남긴다.
+LEAGUE = league_effect(d, years, K_VALUES)
+print(f"리그 강도 — 리그 간 이적자 {LEAGUE['n']}명 (PL→라리가 {LEAGUE['n_pl_ll']} · 라리가→PL {LEAGUE['n_ll_pl']}) · "
+      f"대조군 {LEAGUE['n_ctrl']}명 · 보정 {'켬' if LEAGUE['applied'] else '안 함'}")
+for m, v in LEAGUE["metrics"].items():
+    print(f"  {m:<7} 추정 {v['est']:+.4f}  95% CI [{v['lo']:+.4f}, {v['hi']:+.4f}]")
+    if v["excludes_zero"]:
+        msg = (f"리그 강도 {m}: 95% 신뢰구간 [{v['lo']:+.4f}, {v['hi']:+.4f}]이 0을 포함하지 않는다 "
+               f"(n={LEAGUE['n']}) — 보정은 켜지 않았다. 켤지 사람이 검토한다.")
+        print(f"⚠ {msg}")
+        if os.environ.get("GITHUB_ACTIONS"):
+            print(f"::warning title=리그 강도::{msg}")
 
 
 # --------------------------------------------------------------- teams
@@ -299,7 +312,8 @@ out = dict(
               zstats={lab: {m: [round(mu, 4), round(sd, 4)] for m, (mu, sd) in st.items()}
                       for lab, st in z_stats(pool).items()},
               style=[dict(k=k, raw=raw, label=lab) for k, raw, lab in STYLE],
-              style_rare_cut=round(STYLE_RARE_CUT, 2), style_stab=STYLE_STAB,      # 대체 가치: (후보 − 현 라인) × VALUE_MINS/90 — 주전 한 시즌 가정
+              style_rare_cut=round(STYLE_RARE_CUT, 2), style_stab=STYLE_STAB,
+              league_adj=LEAGUE,      # 대체 가치: (후보 − 현 라인) × VALUE_MINS/90 — 주전 한 시즌 가정
               pos_groups=list(POS_GROUPS),
               # pc(그룹 백분위)와 축소 사전평균은 peer_groups 기준. 합쳤으면 groups_merged에 기록
               peer_groups=counts, min_group=MIN_GROUP, groups_merged=MERGES,
