@@ -252,6 +252,10 @@ details.excl p{font-size:13px;color:var(--ink-3);margin:4px 0 12px}
 .near li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}
 .near .tn{font-weight:600}
 .near .st{font-size:12px;color:var(--ink-3);margin-left:6px}
+.stysent{margin:0 0 12px;font-size:15px;color:var(--ink)}
+.stysent .num{font-weight:600}
+.near .dir{display:block;font-size:12px;color:var(--ink-3);margin-top:2px}
+.near-rare{margin:0 0 4px;font-size:13px;color:var(--ink-2)}
 .near .dv{font-family:var(--f-num);font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink-2)}
 #styleMap circle{cursor:pointer}
 /* 현 라인과 유형 비교 */
@@ -394,12 +398,14 @@ footer p{margin:0 0 8px;max-width:80ch}
 
     <div class="blk" style="margin-top:24px">
       <h3>스타일 지도</h3>
-      <span class="sub">팀 수준(경기당 xG 차이)으로 설명되는 몫을 뺀 값 · 0 = 같은 수준 팀의 리그 평균 · 점을 누르면 롱볼·크로스 비중</span>
+      <span class="sub" id="styleSub">팀 수준(경기당 xG 차이)으로 설명되는 몫을 뺀 값 · 0 = 같은 수준 팀의 리그 평균 · 점을 누르면 롱볼·크로스 비중</span>
       <div class="stylew">
         <div id="styleMap"></div>
         <div>
+          <p class="stysent" id="stySent"></p>
           <h3 style="font-size:13px">스타일이 가장 비슷한 팀</h3>
           <span class="sub" id="nearSub">–</span>
+          <p class="near-rare" id="nearRare" hidden></p>
           <ul class="near" id="nearList"></ul>
         </div>
       </div>
@@ -524,6 +530,7 @@ footer p{margin:0 0 8px;max-width:80ch}
       비율도 리그 순위와의 상관이 0.5~0.64로 강했습니다. 둘 다 스타일이 아니라 팀 수준을 재고 있었기 때문에,
       점유율과 세 비율을 리그별로 경기당 xG 차이에 회귀한 잔차, 즉 "수준 대비" 값으로 바꿨습니다(네 값 모두 순위와 |rho| ≤ 0.21).
       비슷한 팀은 이 네 값의 마할라노비스 거리(공분산은 두 리그 40팀에서 추정)로 고릅니다.
+      <span id="styleStab"></span>
       이적 선수 122명에서 출발 팀과 도착 팀의 스타일 거리는 역할 점수 변화량과 관계가 없어(스피어만 rho −0.01, p 0.94) 적응 리스크는 표시하지 않습니다.</p>
       <p><b>현 라인과 유형 비교.</b> 펼친 카드의 유형 유사도는 후보의 13개 지표 프로필을 목표 팀 같은 포지션 라인의 평균 프로필(출전 시간 가중, 축소값)과
       비교한 가중 코사인입니다(비슷한 선수와 같은 그룹 z · 같은 시즌간 r 가중치). 좋고 나쁨이 아니라 지금 라인과 유형이 얼마나 같은지를 보여 주며, 순위와 역할 점수에는 섞지 않습니다.</p>
@@ -890,11 +897,38 @@ function renderDiagnosis(){
   }).join('');
 }
 
+/* 스타일 문장: 잔차 4개 중 40팀 안 |z|가 큰 것부터 2개(세 번째는 |z| ≥ 1일 때만).
+   가장 큰 |z|도 STY_FLAT 미만이면 '평균에 가까운 팀' */
+const STY = {
+  poss_res:  {s:'점유',   v:x=>x.poss_res,      up:['공을 더 갖고','공을 더 갖는'],         dn:['공은 덜 갖고','공은 덜 갖는']},
+  long_res:  {s:'롱볼',   v:x=>x.long_res*100,  up:['롱볼을 더 쓰고','롱볼을 더 쓰는'],     dn:['롱볼을 덜 쓰고','롱볼을 덜 쓰는']},
+  cross_res: {s:'크로스', v:x=>x.cross_res*100, up:['크로스를 더 올리고','크로스를 더 올리는'], dn:['크로스를 덜 올리고','크로스를 덜 올리는']},
+  press_res: {s:'압박',   v:x=>x.press_res*100, up:['압박은 높고','압박은 높은'],           dn:['압박은 낮고','압박은 낮은']}
+};
+const STY_FLAT = 0.5;   // |z|가 이보다 작으면 '평균 근처'
+function styleKeys(t){
+  const ks = Object.keys(STY).sort((a,b)=>Math.abs(t.style_z[b])-Math.abs(t.style_z[a]));
+  if(Math.abs(t.style_z[ks[0]]) < STY_FLAT) return [];
+  return ks.filter((k,i)=> i<2 || (i===2 && Math.abs(t.style_z[k]) >= 1));
+}
+function styleSentence(t){
+  const ks = styleKeys(t);
+  if(!ks.length) return '수준에 비해 뚜렷하게 치우친 스타일이 없는, 평균에 가까운 팀';
+  return '수준에 비해 ' + ks.map((k,i)=>{
+    const d = STY[k], up = t.style_z[k] > 0, last = i===ks.length-1;
+    return (up ? d.up : d.dn)[last ? 1 : 0] + '(<span class="num">' + pctp(d.v(t)) + '</span>)';
+  }).join(', ') + ' 팀';
+}
+const arrow = z => z >= STY_FLAT ? '↑' : z <= -STY_FLAT ? '↓' : '≈';
+
 /* 스타일 지도: 가로 수준 대비 점유(%p), 세로 수준 대비 압박 높이(전방 탈취 비중, %p) — 리그 20팀, 선택 팀 강조 */
 const pctp = v => sgn(v, f1) + '%p';
 function renderStyle(){
   const t = team(), tt = D.teams[S.lg];
   if(t.poss_res == null){ $('#styleMap').innerHTML = ''; $('#nearList').innerHTML = ''; return; }
+  const stab = D.meta.style_stab, unstable = stab && Object.values(stab.r).some(r=>r < 0.5);
+  $('#styleSub').textContent = '팀 수준(경기당 xG 차이)으로 설명되는 몫을 뺀 값 · 0 = 같은 수준 팀의 리그 평균 · 점을 누르면 롱볼·크로스 비중'
+    + (unstable ? ' · 한 시즌('+D.meta.season+') 기준 · 시즌마다 바뀔 수 있음' : '');
   const W=360, H=280, ml=44, mr=12, mt=12, mb=40;
   const xs = tt.map(x=>x.poss_res), ys = tt.map(x=>x.press_res*100);
   const ex = Math.max(...xs.map(Math.abs))*1.15 || 1, ey = Math.max(...ys.map(Math.abs))*1.15 || 1;
@@ -925,10 +959,16 @@ function renderStyle(){
     c.addEventListener('click', e=>showTip(tipOf(x), e.clientX, e.clientY));
     c.addEventListener('mouseleave', hideTip);
   });
+  $('#stySent').innerHTML = esc(t.name) + ' — ' + styleSentence(t);
   $('#nearSub').textContent = '두 리그 40팀 중 · 수준 대비 점유·롱볼 비중·크로스 비중·압박 높이 4개의 마할라노비스 거리 (작을수록 비슷)';
+  const rare = $('#nearRare');
+  rare.hidden = !t.style_rare;
+  if(t.style_rare) rare.innerHTML = '비슷한 스타일이 드문 팀 — 가장 가까운 팀도 거리 <span class="num">'+f2(t.style_near[0][2])+'</span> (40팀 중 가장 먼 10%)';
+  const ks = styleKeys(t).length ? styleKeys(t) : Object.keys(STY);
   $('#nearList').innerHTML = (t.style_near || []).map(([l, id, dd])=>{
     const x = D.teams[l].find(y=>y.id===id); if(!x) return '';
-    return '<li><span><span class="tn">'+esc(x.name)+'</span><span class="st">'+LGSHORT[l]+' '+(x.rank||'–')+'위</span></span><span class="dv">'+f2(dd)+'</span></li>';
+    return '<li><span><span class="tn">'+esc(x.name)+'</span><span class="st">'+LGSHORT[l]+' '+(x.rank||'–')+'위</span>'
+      + '<span class="dir">'+ks.map(k=>STY[k].s+' '+arrow(x.style_z[k])).join(' · ')+'</span></span><span class="dv">'+f2(dd)+'</span></li>';
   }).join('');
 }
 
@@ -986,9 +1026,17 @@ function typeHtml(p){
   const na = Math.sqrt(a.reduce((s,x,i)=>s + wv[i]*x*x, 0)), nb = Math.sqrt(b.reduce((s,x,i)=>s + wv[i]*x*x, 0));
   if(!na || !nb) return '';
   const diff = ms.map((m,i)=>[m, Math.sqrt(wv[i])*(a[i]-b[i])]).sort((x,y)=>Math.abs(y[1])-Math.abs(x[1])).slice(0,3);
+  // 가장 비슷한 현 선수: 현 스쿼드 같은 포지션(후보 풀) 선수 각각과 D 방식 유사도(13개 전부, 같은 z·같은 가중치)의 최댓값
+  const all = Object.keys(zs), wa = all.map(m=>w[m]);
+  const zv = q => all.map(m=>z(q[m+'_adj'], m));
+  const cos = (u,v)=>{ let d=0,nu=0,nv=0; u.forEach((x,i)=>{ d+=wa[i]*x*v[i]; nu+=wa[i]*x*x; nv+=wa[i]*v[i]*v[i]; }); return nu&&nv ? d/Math.sqrt(nu*nv) : null; };
+  const me = zv(p);
+  const mates = D.players.filter(q=>q.tid===t.id && q.l===S.lg && q.p===p.p).map(q=>[q, cos(me, zv(q))]).filter(x=>x[1]!=null).sort((x,y)=>y[1]-x[1]);
   return '<div class="typew"><h4>현 라인과 유형 비교 <span>· '+esc(t.name)+' '+POSNAME[p.p]+' 라인 평균 프로필과의 가중 코사인 — 좋고 나쁨이 아니라 유형이 얼마나 같은지</span></h4>'
     + '<p>현 라인과 유형 유사도 <b class="num">'+sgn(dot/(na*nb), f2)+'</b> · 가장 크게 다른 지표: '
-    + diff.map(([m,v])=>esc(MNAME[m])+' '+(v>0?'더 많음':'더 적음')).join(', ')+'</p></div>';
+    + diff.map(([m,v])=>esc(MNAME[m])+' '+(v>0?'더 많음':'더 적음')).join(', ')+'</p>'
+    + (mates.length ? '<p>가장 비슷한 현 선수: <b>'+esc(mates[0][0].n)+'</b> <span class="num">'+sgn(mates[0][1], f2)+'</span></p>' : '')
+    + '</div>';
 }
 
 const SIM_RARE = 0.6;   // 1위 유사도가 이보다 낮으면 '비슷한 유형이 드문 선수'
@@ -1245,6 +1293,13 @@ function initMeta(){
     $('#mergeMethod').hidden = false;
     $('#mergeMethod').innerHTML = '<b>포지션 그룹 병합.</b> 그룹 인원이 '+D.meta.min_group+'명 미만이면 백분위가 거칠어져 이웃 그룹과 합쳐 계산합니다 — '
       + mg.map(x=>esc(x.group)+' '+x.n+'명 + '+esc(x.into)+' '+x.n_into+'명 → '+esc(x.result)+' '+x.n_result+'명').join(' · ') + '.';
+  }
+  const stab = D.meta.style_stab;
+  if(stab){
+    const nm = {poss_res:'점유', long_res:'롱볼 비중', cross_res:'크로스 비중', press_res:'압박 높이'};
+    $('#styleStab').innerHTML = '완주한 연속 시즌에 모두 있는 팀(<span class="num">'+stab.n+'</span>팀·시즌쌍)으로 잰 시즌간 r은 '
+      + Object.keys(stab.r).map(k=>nm[k]+' <span class="num">'+f2(stab.r[k])+'</span>').join(' · ')
+      + '입니다' + (Object.values(stab.r).some(r=>r<0.5) ? ' — 0.5 미만인 지표는 시즌마다 크게 바뀌므로 스타일 지도는 한 시즌 기준으로만 읽어야 합니다.' : '.');
   }
   const sk = D.meta.shrink && D.meta.shrink.k;
   if(sk){
