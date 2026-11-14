@@ -164,17 +164,45 @@ for lab in peer_labels(pool):
     print(f"  {lab:<5}{SIM_WN[lab]:>3}" + "".join(f"{SIM_W[lab][m]:>7.2f}" for m in PLAYER_METRICS))
 SIM = similar_players(pool, SIM_W)
 
+VALUE_MINS = 2500
+
+# 라인 평균 — 팀 진단의 포지션별 생산량과 영입 후보의 "현 라인 대비"(대체 가치)가 같이 쓰는 정의.
+# 그 팀의 그 포지션 그룹(기본 그룹) 선수 전원의 축소값을 출전 시간으로 가중 평균한다.
+# 후보 풀 밖 선수(600분 미만 등)도 같은 K·같은 사전평균으로 축소한다 — 출전이 짧을수록 그룹 평균에 가깝다.
+# per-90 파일 자격이 없는 선수는 패스·태클 등이 결측이라 그 지표의 평균에서만 빠진다.
+LINE_METRICS = {"npxG90": ["npxG90"], "xA90": ["xA90"], "pass90": ["pass90"],
+                "ti90": ["tkl90", "int90"], "clr90": ["clr90"]}
+PEER_OF = {p["pos"]: p["peer"] for p in pool}
+
+
+def shrunk(p, m):
+    if p.get(m) is None:
+        return None
+    if m + "_adj" in p:
+        return p[m + "_adj"]
+    k, mu = K_VALUES[m], PRIOR[PEER_OF[p["pos"]]][m]
+    return (p[m] * p["mins"] + mu * k) / (p["mins"] + k)
+
+
+def line_avg(grp, parts):
+    vals = [(sum(v), p["mins"]) for p in grp
+            for v in [[shrunk(p, m) for m in parts]] if None not in v]
+    tot = sum(w for _, w in vals)
+    return (round(sum(x * w for x, w in vals) / tot, 4) if tot else None), len(vals)
+
+
 for lg, tt in teams.items():
     for name, t in tt.items():
         squad = [p for p in players if p["team_id"] == t["id"] and p["league"] == lg]
         t["squad_n"] = len(squad)
         for posg in POS_GROUPS:
             grp = [p for p in squad if p["pos"] == posg]
-            mins = sum(p["mins"] for p in grp) or 1
-            t.setdefault("by_pos", {})[posg] = dict(
-                n=len(grp),
-                npxG90=round(sum(p["npxG"] for p in grp) / (mins / 90), 3),
-                xA90=round(sum(p["xA"] for p in grp) / (mins / 90), 3))
+            bp = dict(n=len(grp), mins=sum(p["mins"] for p in grp))
+            for k, parts in LINE_METRICS.items():
+                bp[k], n_used = line_avg(grp, parts)
+                if k == "pass90":
+                    bp["n_el"] = n_used           # per-90 지표에 들어간 인원 (자격 있는 선수)
+            t.setdefault("by_pos", {})[posg] = bp
         top = sorted(squad, key=lambda p: -(p["npxG"] + p["xA"]))[:6]
         t["top"] = [dict(name=p["name"], pos=p["pos"], mins=p["mins"], g=p["g"], a=p["a"],
                          npxG90=round(p["npxG90"], 2), xA90=round(p["xA90"], 2)) for p in top]
@@ -185,9 +213,9 @@ for lg, tt in teams.items():
 for lg, tt in teams.items():
     for posg in POS_GROUPS:
         for m in ("npxG90", "xA90"):
-            vals = [t["by_pos"][posg][m] for t in tt.values()]
+            vals = [t["by_pos"][posg][m] or 0.0 for t in tt.values()]
             for t in tt.values():
-                t["by_pos"][posg].setdefault("pct", {})[m] = round(pct_rank(vals, t["by_pos"][posg][m]), 1)
+                t["by_pos"][posg].setdefault("pct", {})[m] = round(pct_rank(vals, t["by_pos"][posg][m] or 0.0), 1)
 
 
 def rnd(x, k=3):
@@ -224,6 +252,7 @@ out = dict(
               season_note=SEASON_NOTE,
               sim_w={lab: {m: round(SIM_W[lab][m], 2) for m in PLAYER_METRICS} for lab in SIM_W},
               sim_w_n=SIM_WN,
+              value_mins=VALUE_MINS,      # 대체 가치: (후보 − 현 라인) × VALUE_MINS/90 — 주전 한 시즌 가정
               pos_groups=list(POS_GROUPS),
               # pc(그룹 백분위)와 축소 사전평균은 peer_groups 기준. 합쳤으면 groups_merged에 기록
               peer_groups=counts, min_group=MIN_GROUP, groups_merged=MERGES,

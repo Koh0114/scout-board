@@ -77,7 +77,7 @@ a{color:var(--accent)}
 .seg button[aria-pressed="true"],.seg button[aria-selected="true"]{background:var(--accent);color:var(--on-accent)}
 select{font-size:13px;font-weight:600;background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:6px 10px;color:var(--ink)}
 #teamSel{min-width:220px}
-.upd{margin-left:auto;font-size:12px;color:var(--ink-3);white-space:nowrap}
+.upd{font-size:12px;color:var(--ink-3);white-space:nowrap}
 
 /* ---------- 결론 스트립 ---------- */
 .strip{position:relative;margin-top:20px;border:1px solid var(--line);border-radius:6px;background:var(--surface);
@@ -151,6 +151,16 @@ tr.open .tag{background:var(--track)}
 .score .num{font-size:13px;font-weight:600;min-width:34px;text-align:right}
 tr.det td{height:auto;padding:16px 16px 18px;background:var(--bg)}
 .det-note{margin:12px 0 0;font-size:12px;color:var(--ink-3)}
+/* 대체 가치 캐비엇 · 링크 복사 */
+.vnote{margin:-4px 0 12px;font-size:12px;color:var(--ink-3)}
+.copy{appearance:none;border:0;background:var(--surface-2);color:var(--ink-2);border-radius:6px;padding:6px 12px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
+.copy:hover{color:var(--ink)}
+.copy.done{color:var(--accent)}
+.topbar .copy{margin-left:auto}
+.nrow-w{display:flex;align-items:flex-start;gap:12px}
+.nrow-w .nrow{flex:1;min-width:0}
+.nrow-w .copy{flex:none}
+th small{display:block;font-weight:400}
 .tbl.nopos .c-pos{display:none}
 
 /* 펼친 선수: 숫자 줄 → 막대 묶음 3개 → 백분위 기준 각주 */
@@ -321,6 +331,7 @@ footer p{margin:0 0 8px;max-width:80ch}
       <button id="lg-La_liga" aria-pressed="false">라리가</button>
     </div>
     <select id="teamSel" aria-label="팀 선택"></select>
+    <button class="copy" id="copyTop" type="button" aria-live="polite">링크 복사</button>
     <span class="upd">갱신 <span class="num" id="m-upd">–</span></span>
   </div>
 </header>
@@ -359,7 +370,7 @@ footer p{margin:0 0 8px;max-width:80ch}
       </div>
       <div class="blk">
         <h3>포지션별 생산량</h3>
-        <span class="sub">라인별 선수들의 출전 시간 기준 90분당 값 · 리그 안 백분위</span>
+        <span class="sub">라인 선수 전원의 90분당 값을 출전 시간으로 가중 평균 · 표본 크기 보정(축소)값 · 리그 안 백분위</span>
         <div class="bars1" id="posBars"></div>
         <div class="scale" aria-hidden="true"><span></span><span><span>← 리그 하위</span><span>리그 상위 →</span></span><span></span></div>
       </div>
@@ -393,12 +404,14 @@ footer p{margin:0 0 8px;max-width:80ch}
     <div class="cand">
       <div>
         <div class="cand-head"><h2 id="candTitle">–</h2><span class="sub" id="candHint">–</span></div>
+        <p class="vnote" id="valNote"></p>
         <div class="tbl cands" id="candTbl">
           <table>
             <thead><tr>
               <th></th><th>선수</th><th class="c-pos">포지션</th>
               <th class="n">출전</th><th class="n">G+A</th>
               <th class="n" id="colA">–</th><th class="n" id="colB">–</th>
+              <th class="n" id="colV">현 라인 대비</th>
               <th class="n">역할 점수</th>
             </tr></thead>
             <tbody id="candBody"></tbody>
@@ -473,6 +486,10 @@ footer p{margin:0 0 8px;max-width:80ch}
       <p><b>표본 크기 보정.</b> 표에 보이는 per-90 값은 원값이지만, 백분위와 역할 점수는 출전 시간으로 축소(shrinkage)한 값으로 계산합니다 —
       <span class="num">조정값 = (원값 × 출전분 + 포지션 그룹 평균 × K) / (출전분 + K)</span>. 600분만 뛴 선수의 per-90은 상당 부분이 운이라 2900분 뛴 선수와 같은 무게로 둘 수 없기 때문입니다.
       <span id="shrinkline"></span></p>
+      <p><b>현 라인 대비 (대체 가치).</b> 후보의 역할 핵심 지표(축소값)에서 목표 팀 같은 포지션 라인의 평균을 뺀 값입니다.
+      라인 평균은 팀 진단의 포지션별 생산량과 같은 정의 — 그 라인 선수 전원의 축소값을 출전 시간으로 가중 평균 — 입니다.
+      결정력(npxG)·찬스 메이킹(xA)은 차이 × <span class="num">2500</span>분 / 90으로 한 시즌 골 단위, 빌드업·볼 탈취·박스 수비는 90분당 차이로만 보여 줍니다.
+      팀이 바뀌면 생산량도 바뀌므로 상한 추정치이고, 역할끼리 더한 총합은 만들지 않습니다.</p>
       <p><b>점유율 보정.</b> 팀 진단의 수비 활동량(태클+인터셉트)은 상대 점유율 50%로 환산해 비교합니다
       (<span class="num">× 50 / (100 − 팀 점유율)</span>). 선수 지표에는 같은 보정을 넣지 않았습니다 — 백테스트에서 다음 시즌 예측이 오히려 나빠졌습니다.</p>
       <p><b>한계.</b> npxG는 FotMob에 없어 <span class="num">xG − 0.79 × PK 골</span>로 근사했습니다(실축한 PK는 빼지 못합니다).
@@ -558,6 +575,26 @@ const POS_WEAK_CUT = 45;   // 팀 진단에서 포지션 약점으로 부르는 
 const posWeakItems = t => POS_WEAK.map(w=>Object.assign({}, w, {p:t.by_pos[w.pos].pct[w.m], label:POSNAME[w.pos]+' '+w.lab}));
 const ROLE_ORDER = ['finisher','creator','progressor','ballwinner','boxdef'];
 
+/* 대체 가치 (F): 후보 축소값 − 목표 팀 같은 포지션 라인 평균(build.py by_pos, 같은 정의).
+   골 단위 역할만 × value_mins/90 으로 시즌 차이, 나머지는 /90 차이 그대로. 색 없이 부호만. */
+const VALUE = {
+  finisher:   {k:'npxG90', parts:['npxG90'],         season:true,  u:'npxG'},
+  creator:    {k:'xA90',   parts:['xA90'],           season:true,  u:'xA'},
+  progressor: {k:'pass90', parts:['pass90'],         season:false, u:'성공 패스/90',      fmt:f1},
+  ballwinner: {k:'ti90',   parts:['tkl90','int90'],  season:false, u:'태클+인터셉트/90', fmt:f2},
+  boxdef:     {k:'clr90',  parts:['clr90'],          season:false, u:'클리어/90',        fmt:f2}
+};
+const VALUE_CAVEAT = '팀이 바뀌면 생산량도 바뀌므로 상한 추정치.';
+const valueUnit = r => VALUE[r].season ? '시즌 '+VALUE[r].u : VALUE[r].u;
+function lineDiff(p, r){
+  const v = VALUE[r], bp = team().by_pos[p.p], line = bp ? bp[v.k] : null;
+  if(line == null) return null;
+  const d = v.parts.reduce((a,m)=>a + p[m+'_adj'], 0) - line;
+  return v.season ? d * D.meta.value_mins / 90 : d;
+}
+const valueNum = (p, r) => { const d = lineDiff(p, r); return d == null ? '–' : sgn(d, VALUE[r].season ? f1 : VALUE[r].fmt); };
+const valueCaveat = r => VALUE_CAVEAT + (VALUE[r].season ? ' '+D.meta.value_mins+'분 = 주전 한 시즌 가정.' : '');
+
 /* ---- state ---- */
 const TABS = ['diagnosis','recruit','validation'];
 const S = {lg:'EPL', team:null, role:null, mins:600, cross:false, pos:'ALL', open:null, tab:'recruit', btRole:null};
@@ -598,7 +635,7 @@ function setTab(name, push){
     b.setAttribute('aria-selected', String(on)); b.tabIndex = on ? 0 : -1;
     $('#p-'+t).hidden = !on;
   });
-  if(push && location.hash !== '#'+name) history.replaceState(null, '', '#'+name);
+  syncURL();
 }
 document.querySelectorAll('.tabs button').forEach((b,i,all)=>{
   b.addEventListener('click',()=>setTab(b.dataset.tab, true));
@@ -620,21 +657,80 @@ function fillTeams(){
   });
   S.team = sel.value;
 }
+function setLeague(lg){
+  S.lg = lg;
+  $('#lg-EPL').setAttribute('aria-pressed', String(lg==='EPL'));
+  $('#lg-La_liga').setAttribute('aria-pressed', String(lg==='La_liga'));
+}
 ['EPL','La_liga'].forEach(lg=>{
-  $('#lg-'+lg).addEventListener('click',()=>{
-    S.lg=lg;
-    $('#lg-EPL').setAttribute('aria-pressed', String(lg==='EPL'));
-    $('#lg-La_liga').setAttribute('aria-pressed', String(lg==='La_liga'));
-    fillTeams(); S.role=null; S.open=null; render();
-  });
+  $('#lg-'+lg).addEventListener('click',()=>{ setLeague(lg); fillTeams(); S.role=null; S.open=null; render(); });
 });
 $('#teamSel').addEventListener('change',e=>{S.team=e.target.value; S.role=null; S.open=null; render();});
-$('#minsRange').addEventListener('input',e=>{S.mins=+e.target.value; $('#minsOut').textContent=S.mins; renderRecruit();});
+$('#minsRange').addEventListener('input',e=>{setMins(+e.target.value); renderRecruit();});
 $('#crossOnly').addEventListener('change',e=>{S.cross=e.target.checked; renderRecruit();});
 $('#posSel').addEventListener('change',e=>{S.pos=e.target.value; renderRecruit();});
 $('#btRole').addEventListener('change',e=>{S.btRole=e.target.value; btScatter();});
 const team = () => D.teams[S.lg].find(t=>t.name===S.team);
 function setPos(v){ S.pos = v; $('#posSel').value = v; }
+function setMins(v){ S.mins = v; $('#minsRange').value = v; $('#minsOut').textContent = v; }
+
+/* ---- URL 상태 (G) ----
+   ?league=EPL&team=<팀 ID>&role=creator&pos=FB&mins=600[&cross=1][&player=<선수 ID>]#recruit
+   상태가 바뀔 때마다 replaceState로 덮어쓴다(뒤로가기 기록은 쌓지 않는다).
+   읽을 때 없거나 이상한 값은 조용히 기본값. */
+let URL_READY = false;           // 복원이 끝나기 전에는 쓰지 않는다
+function syncURL(){
+  if(!URL_READY) return;
+  const t = team(), q = new URLSearchParams();
+  q.set('league', S.lg); q.set('team', t.id); q.set('role', S.role); q.set('pos', S.pos); q.set('mins', S.mins);
+  if(S.cross) q.set('cross', '1');
+  const op = S.open && PK.get(S.open);
+  if(op) q.set('player', op.id);
+  const u = location.pathname + '?' + q.toString() + '#' + S.tab;
+  if(u !== location.pathname + location.search + location.hash) history.replaceState(null, '', u);
+}
+/* 리그·팀·필터를 URL에서 채운다. 펼칠 선수 키(없으면 null)를 돌려준다. */
+function readURL(){
+  const q = new URLSearchParams(location.search);
+  const lg = q.get('league');
+  if(lg && D.teams[lg]) setLeague(lg);
+  fillTeams();
+  const tq = q.get('team');
+  const t = tq && D.teams[S.lg].find(x=>String(x.id)===tq || x.name===tq);
+  if(t){ S.team = t.name; $('#teamSel').value = t.name; }
+  NEED = computeNeeds(team());
+  const r = q.get('role');
+  S.role = (r && D.roles[r]) ? r : NEED.order[0];
+  const pos = q.get('pos');
+  setPos((pos==='ALL' || POS5.includes(pos)) ? pos : (NEED.posHint[S.role] || 'ALL'));
+  const ms = q.get('mins'), lo = +$('#minsRange').min, hi = +$('#minsRange').max, st = +$('#minsRange').step;
+  if(ms && /^\d+$/.test(ms) && +ms >= lo && +ms <= hi) setMins(lo + Math.round((+ms - lo) / st) * st);
+  S.cross = q.get('cross') === '1'; $('#crossOnly').checked = S.cross;
+  const pid = q.get('player');
+  if(!pid) return null;
+  const cand = D.players.filter(p=>String(p.id)===pid && !(p.tid===team().id && p.l===S.lg));   // 목표 팀 선수는 후보가 아니다
+  return cand.length ? cand[0].l+':'+cand[0].id : null;
+}
+
+/* 링크 복사 — 성공하면 잠깐 '링크 복사됨' */
+async function copyLink(btn){
+  syncURL();
+  const url = location.href;
+  let ok = false;
+  try{ await navigator.clipboard.writeText(url); ok = true; }
+  catch(e){
+    const ta = el('textarea'); ta.value = url; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+    document.body.appendChild(ta); ta.select();
+    try{ ok = document.execCommand('copy'); }catch(_){ ok = false; }
+    ta.remove();
+  }
+  if(!btn.dataset.label) btn.dataset.label = btn.textContent;
+  btn.textContent = ok ? '링크 복사됨' : '복사 실패 — 주소창을 복사하세요';
+  btn.classList.toggle('done', ok);
+  clearTimeout(btn._t);
+  btn._t = setTimeout(()=>{ btn.textContent = btn.dataset.label; btn.classList.remove('done'); }, 1600);
+}
+$('#copyTop').addEventListener('click', e=>copyLink(e.currentTarget));
 /* 같은 리그 안 순위 (백분위가 높을수록 1위, 방향은 이미 뒤집혀 있다) */
 const rankOf = (p, ps) => 1 + ps.filter(x=>x > p).length;
 
@@ -782,7 +878,11 @@ function detailHtml(p){
   else kv.push([D.meta.form_season+' 현재', p.now ? mga(p.now.m, p.now.g, p.now.a) : '90분 미만']);
   kv.push(['결정력 초과 (득점−npxG)', '<span class="num">'+sgn(p.fin, f2)+'</span>골']);
   if(p.lbp90!=null) kv.push(['라인 브레이킹 패스', '<span class="num">'+f2(p.lbp90)+'</span>/90']);
-  return '<dl class="nrow">'+kv.map(([a,b])=>'<div><dt>'+esc(a)+'</dt><dd>'+b+'</dd></div>').join('')+'</dl>'
+  const t = team();
+  kv.push(['현 라인 대비 · '+t.name+' '+POSNAME[p.p], (VALUE[S.role].season ? '시즌 ' : '')+'<span class="num">'+valueNum(p, S.role)+'</span> '+esc(VALUE[S.role].u)]);
+  return '<div class="nrow-w"><dl class="nrow">'+kv.map(([a,b])=>'<div><dt>'+esc(a)+'</dt><dd>'+b+'</dd></div>').join('')+'</dl>'
+    + '<button class="copy" type="button" data-copy="'+p.l+':'+p.id+'" aria-live="polite">링크 복사</button></div>'
+    + '<p class="vnote">'+esc(valueCaveat(S.role))+'</p>'
     + '<div class="pgroups">' + PGROUPS.map(([g, ms])=>'<div class="pgroup"><h4>'+g+'</h4>'
         + ms.map(([k,lab])=>pbar(lab, p.pc[k], {title:MLAB[k]+' '+f2(p[k])})).join('') + '</div>').join('') + '</div>'
     + simHtml(p)
@@ -808,13 +908,17 @@ function simHtml(p){
       }).join('') + '</ul></div>';
 }
 
-/* 그 선수가 후보 명단에 보이도록 필터를 바꾸고 펼친다 */
-function goTo(key){
+/* 그 선수가 후보 명단에 보이도록 필터를 바꾸고 펼친다.
+   keepPos=true(URL 복원)면 지금 포지션 필터가 그 선수를 이미 포함할 때 그대로 둔다. */
+function goTo(key, keepPos){
   const q = PK.get(key); if(!q) return;
   if(S.cross && q.l===S.lg){ S.cross=false; $('#crossOnly').checked=false; }
-  if(q.m < S.mins){ S.mins=D.meta.pool_min; $('#minsRange').value=S.mins; $('#minsOut').textContent=S.mins; }
-  if(!D.role_groups[S.role].includes(q.p)) S.role = NEED.order.find(r=>D.role_groups[r].includes(q.p));
-  setPos(q.p); S.open = key;
+  if(q.m < S.mins){ setMins(D.meta.pool_min); }
+  if(!(keepPos && groupsNow().includes(q.p))){
+    if(!D.role_groups[S.role].includes(q.p)) S.role = NEED.order.find(r=>D.role_groups[r].includes(q.p));
+    setPos(q.p);
+  }
+  S.open = key;
   renderRecruit();
   const target = [...document.querySelectorAll('[data-key="'+key+'"]')].find(e=>e.offsetParent);
   if(target){ target.scrollIntoView({block:'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'}); target.focus({preventScroll:true}); }
@@ -833,11 +937,15 @@ function renderRecruit(){
   $('#colA').textContent = MLAB[ka]; $('#colB').textContent = MLAB[kb];
   $('#candTitle').textContent = roleShort(S.role) + ' 후보';
   $('#candHint').textContent = groupsNow().map(g=>POSNAME[g]).join('·') + ' ' + list.length + '명 중 상위 15명 · ' + S.mins + '분 이상' + (S.cross? ' · 상대 리그만':'');
+  $('#colV').innerHTML = '현 라인 대비<small>'+esc(valueUnit(S.role))+'</small>';
+  const lineName = onePos ? team().name+' '+POSNAME[groupsNow()[0]]+' 라인' : '각 후보와 같은 포지션의 '+team().name+' 라인';
+  $('#valNote').textContent = '현 라인 대비 = 후보 '+(VALUE[S.role].parts.map(m=>MLAB[m].replace('/90','')).join('+'))
+    + ' − '+lineName+' 평균(출전 시간 가중, 축소값)'+(VALUE[S.role].season ? ', 시즌 기준' : ', 90분당')+'. '+valueCaveat(S.role);
 
   // 데스크톱 표
   const body = $('#candBody'); body.innerHTML='';
   shown.forEach(e=>{
-    if(!e){ const g = el('tr','gap'); g.innerHTML = '<td colspan="8">⋯</td>'; body.appendChild(g); return; }
+    if(!e){ const g = el('tr','gap'); g.innerHTML = '<td colspan="9">⋯</td>'; body.appendChild(g); return; }
     const [p,i] = e;
     const key = p.l+':'+p.id, isOpen = S.open===key;
     const tr = el('tr','row'+(isOpen?' open':''));
@@ -848,11 +956,12 @@ function renderRecruit(){
       + '<td class="n">'+p.m+'′</td>'
       + '<td class="n">'+(p.g+p.a)+'</td>'
       + '<td class="n">'+f2(p[ka])+'</td><td class="n">'+f2(p[kb])+'</td>'
+      + '<td class="n">'+valueNum(p, S.role)+'</td>'
       + '<td class="n"><div class="score"><span class="t"><i style="width:'+p.r[S.role]+'%"></i></span><span class="num">'+f1(p.r[S.role])+'</span></div></td>';
     const det = el('tr','det'); det.hidden = !isOpen;
-    const td = el('td'); td.colSpan = 8; td.innerHTML = detailHtml(p); det.appendChild(td);
+    const td = el('td'); td.colSpan = 9; td.innerHTML = detailHtml(p); det.appendChild(td);
     const toggle = ()=>{ S.open = (S.open===key) ? null : key; const o = S.open===key;
-      det.hidden = !o; tr.classList.toggle('open', o); tr.setAttribute('aria-expanded', String(o)); };
+      det.hidden = !o; tr.classList.toggle('open', o); tr.setAttribute('aria-expanded', String(o)); syncURL(); };
     tr.addEventListener('click', toggle);
     tr.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle();}});
     body.appendChild(tr); body.appendChild(det);
@@ -871,20 +980,23 @@ function renderRecruit(){
       + '<span class="sc">'+f1(p.r[S.role])+'</span></div>'
       + '<div class="score"><span class="t"><i style="width:'+p.r[S.role]+'%"></i></span></div>'
       + '<div class="card-kv"><span>'+MLAB[ka]+'<b>'+f2(p[ka])+'</b></span><span>'+MLAB[kb]+'<b>'+f2(p[kb])+'</b></span><span>'+p.m+'′</span></div>'
+      + '<div class="card-kv"><span>현 라인 대비<b>'+valueNum(p, S.role)+'</b> '+esc(valueUnit(S.role))+'</span></div>'
       + '<div class="card-det"'+(isOpen?'':' hidden')+'>'+detailHtml(p)+'</div>';
     const toggle = ()=>{ S.open = (S.open===key) ? null : key; const o = S.open===key;
-      li.querySelector('.card-det').hidden = !o; li.classList.toggle('open', o); li.setAttribute('aria-expanded', String(o)); };
+      li.querySelector('.card-det').hidden = !o; li.classList.toggle('open', o); li.setAttribute('aria-expanded', String(o)); syncURL(); };
     li.addEventListener('click', e=>{ if(!e.target.closest('.card-det')) toggle(); });
     li.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle();}});
     cards.appendChild(li);
   });
 
   document.querySelectorAll('#p-recruit .simgo').forEach(b=>b.addEventListener('click', e=>{ e.stopPropagation(); goTo(b.dataset.go); }));
+  document.querySelectorAll('#p-recruit .copy[data-copy]').forEach(b=>b.addEventListener('click', e=>{ e.stopPropagation(); S.open = b.dataset.copy; copyLink(b); }));
   renderExcluded();
   renderScatter(top, list);
   renderMerge();
   renderStrip(list);
   if(BT && !S.btRole) btScatter();
+  syncURL();
 }
 
 function renderMerge(){
@@ -1060,9 +1172,11 @@ async function boot(){
   $('#boot').remove();
   PK = new Map(D.players.map(p=>[p.l+':'+p.id, p]));
   initMeta();
-  fillTeams();
+  const openKey = readURL();
   setTab(location.hash.slice(1) || 'recruit', false);
+  URL_READY = true;
   render();
+  if(openKey) goTo(openKey, true);
   // 검증 결과는 선택적이다 — 인라인 payload 배포에는 backtest.json이 없다.
   try{
     const b = await fetch('backtest.json?t=' + Date.now(), {cache:'no-store'});
