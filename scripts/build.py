@@ -12,7 +12,9 @@ from model import (LEAGUES, POOL_MIN, PLAYER_METRICS, DISPLAY_METRICS, ROLES, PO
                    PK_XG, MIN_GROUP, season_label, pct_rank, played, season_block,
                    player_rows, pool_rows, excluded_rows, merge_groups, peer_labels,
                    estimate_k, prior_means, apply_shrinkage, score_pool,
-                   similar_players, sim_weights, SIM_N)
+                   similar_players, sim_weights, SIM_N,
+                   STYLE, team_styles, style_metric, style_euclid, style_neighbors, z_stats,
+                   completed, pearson)
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 RAW = os.path.join(ROOT, "data", "fotmob_raw.json")
@@ -74,6 +76,8 @@ def team_block(lg, yr):
     box, press = by_team("touches_in_opp_box_team"), by_team("poss_won_att_3rd_team")
     poss = by_team("possession_percentage_team")
     tkl, intc = by_team("total_tackle_team"), by_team("interception_team")
+    pas, lng, crs = (by_team("accurate_pass_team"), by_team("accurate_long_balls_team"),
+                     by_team("accurate_cross_team"))
 
     # 최근 6경기 — 끝난 경기만, 시간순
     results = {}
@@ -112,6 +116,8 @@ def team_block(lg, yr):
             press90=press[tid]["StatValue"],
             poss=p,
             defact90=defact,
+            # 스타일 분류용: 경기당 성공 패스·롱볼·크로스 (StatValue가 이미 경기당)
+            pass_pg=pas[tid]["StatValue"], long_pg=lng[tid]["StatValue"], cross_pg=crs[tid]["StatValue"],
             # 점유율 보정: 상대가 공을 50% 가진 것으로 환산 (FOTMOB_MIGRATION.md 3절)
             defact_adj=defact * 50 / (100 - p),
             form=results.get(tid, [])[-6:],
@@ -120,6 +126,40 @@ def team_block(lg, yr):
 
 
 teams = {lg: team_block(lg, SEASON) for lg in LEAGUES}
+
+# 팀 스타일 (ROADMAP E): 수준(xGD90) 대비 잔차 4개 → 두 리그 40팀에서 공분산을 추정한 마할라노비스 거리.
+team_styles({lg: list(tt.values()) for lg, tt in teams.items()})
+ALL_TEAMS = [t for tt in teams.values() for t in tt.values()]
+STYLE_NEAR = style_neighbors(ALL_TEAMS, style_metric(ALL_TEAMS))
+# 사이트 문장용: 잔차 4개의 40팀 안 z (|z|가 큰 것부터 말로 옮긴다)
+for k, _, _ in STYLE:
+    v = [t[k] for t in ALL_TEAMS]
+    mu = sum(v) / len(v)
+    sd = (sum((x - mu) ** 2 for x in v) / len(v)) ** 0.5 or 1.0
+    for t in ALL_TEAMS:
+        t.setdefault("style_z", {})[k] = round((t[k] - mu) / sd, 2)
+# "비슷한 스타일이 드문 팀": 1위 거리가 40팀 중 상위 10%(4팀)
+d1 = sorted((STYLE_NEAR[(t["league"], t["id"])][0][1] for t in ALL_TEAMS), reverse=True)
+STYLE_RARE_CUT = d1[max(1, round(len(d1) * 0.10)) - 1]
+for t in ALL_TEAMS:
+    for k in [k for k, _, _ in STYLE] + ["long_share", "cross_share", "press_share"]:
+        t[k] = round(t[k], 4)
+    t["style_near"] = [[b["league"], b["id"], round(dd, 2)] for b, dd in STYLE_NEAR[(t["league"], t["id"])]]
+    t["style_rare"] = STYLE_NEAR[(t["league"], t["id"])][0][1] >= STYLE_RARE_CUT
+print("비슷한 스타일이 드문 팀(1위 거리 상위 10%): " + ", ".join(
+    f"{t['name']} {STYLE_NEAR[(t['league'], t['id'])][0][1]:.2f}" for t in ALL_TEAMS if t["style_rare"]))
+
+# 스타일 안정성: 완주한 연속 시즌에 모두 있는 팀(같은 리그·같은 ID)으로 잔차 4개 각각의 시즌간 r
+_done = [y for y in years if completed(d, y)]
+_sty = {}
+for y in _done:
+    tt = {lg: list(team_block(lg, y).values()) for lg in LEAGUES}
+    team_styles(tt)
+    _sty[y] = {(t["league"], t["id"]): t for l in tt.values() for t in l}
+_pairs = [(_sty[y][k], _sty[y + 1][k]) for y in _done if y + 1 in _sty for k in _sty[y] if k in _sty[y + 1]]
+STYLE_STAB = dict(n=len(_pairs), seasons=[f"{season_label(y)}→{season_label(y + 1)}" for y in _done if y + 1 in _sty],
+                  r={k: round(pearson([a[k] for a, _ in _pairs], [b[k] for _, b in _pairs]), 2) for k, _, _ in STYLE})
+print(f"스타일 시즌간 r ({STYLE_STAB['n']}팀·시즌쌍 {STYLE_STAB['seasons']}): {STYLE_STAB['r']}")
 players = player_rows(d, SEASON)
 
 form_teams = {}
@@ -202,6 +242,8 @@ for lg, tt in teams.items():
                 bp[k], n_used = line_avg(grp, parts)
                 if k == "pass90":
                     bp["n_el"] = n_used           # per-90 지표에 들어간 인원 (자격 있는 선수)
+            # 라인 프로필: 13개 지표 각각의 라인 평균(같은 정의) — 사이트가 그룹 z로 바꿔 후보와 가중 코사인 비교
+            bp["prof"] = {m: line_avg(grp, [m])[0] for m in PLAYER_METRICS}
             t.setdefault("by_pos", {})[posg] = bp
         top = sorted(squad, key=lambda p: -(p["npxG"] + p["xA"]))[:6]
         t["top"] = [dict(name=p["name"], pos=p["pos"], mins=p["mins"], g=p["g"], a=p["a"],
@@ -252,7 +294,12 @@ out = dict(
               season_note=SEASON_NOTE,
               sim_w={lab: {m: round(SIM_W[lab][m], 2) for m in PLAYER_METRICS} for lab in SIM_W},
               sim_w_n=SIM_WN,
-              value_mins=VALUE_MINS,      # 대체 가치: (후보 − 현 라인) × VALUE_MINS/90 — 주전 한 시즌 가정
+              value_mins=VALUE_MINS,
+              # 13개 지표 그룹 z 기준(축소값) — 유사 선수·현 라인 유형 비교가 같은 기준을 쓴다
+              zstats={lab: {m: [round(mu, 4), round(sd, 4)] for m, (mu, sd) in st.items()}
+                      for lab, st in z_stats(pool).items()},
+              style=[dict(k=k, raw=raw, label=lab) for k, raw, lab in STYLE],
+              style_rare_cut=round(STYLE_RARE_CUT, 2), style_stab=STYLE_STAB,      # 대체 가치: (후보 − 현 라인) × VALUE_MINS/90 — 주전 한 시즌 가정
               pos_groups=list(POS_GROUPS),
               # pc(그룹 백분위)와 축소 사전평균은 peer_groups 기준. 합쳤으면 groups_merged에 기록
               peer_groups=counts, min_group=MIN_GROUP, groups_merged=MERGES,
