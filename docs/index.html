@@ -571,7 +571,9 @@ const POS_WEAK = [
   {pos:'CM', m:'xA90',   role:'creator',  lab:'기회 제공', bad:'라인에서 나오는 결정적 패스가 적다'},
   {pos:'FB', m:'xA90',   role:'creator',  lab:'기회 제공', bad:'라인에서 나오는 결정적 패스가 적다'}
 ];
-const POS_WEAK_CUT = 45;   // 팀 진단에서 포지션 약점으로 부르는 백분위 기준
+const POS_WEAK_CUT = 45;
+/* 근거에 포지션별 생산량 약점이 들어 있을 때만 붙인다 (팀 지표 약점엔 붙이지 않는다) */
+const POS_TACTIC_NOTE = '포지션별 생산량이 낮은 건 전술상 역할 때문일 수도 있음 (예: 수비적으로 쓰는 풀백).';   // 팀 진단에서 포지션 약점으로 부르는 백분위 기준
 const posWeakItems = t => POS_WEAK.map(w=>Object.assign({}, w, {p:t.by_pos[w.pos].pct[w.m], label:POSNAME[w.pos]+' '+w.lab}));
 const ROLE_ORDER = ['finisher','creator','progressor','ballwinner','boxdef'];
 
@@ -738,7 +740,7 @@ const rankOf = (p, ps) => 1 + ps.filter(x=>x > p).length;
 function computeNeeds(t){
   const score = {}, why = {}, posPts = {};
   ROLE_ORDER.forEach(r=>{score[r]=0; why[r]=[]; posPts[r]={};});
-  const add=(r,pts,txt,pos)=>{score[r]+=pts; if(txt) why[r].push({txt, pts}); if(pos) posPts[r][pos]=(posPts[r][pos]||0)+pts;};
+  const add=(r,pts,txt,pos)=>{score[r]+=pts; if(txt) why[r].push({txt, pts, pos}); if(pos) posPts[r][pos]=(posPts[r][pos]||0)+pts;};
   const p = t.pct, all = D.teams[S.lg];
   /* 팀 단위 근거는 백분위 대신 리그 순위로 말한다 */
   const tr = k => '리그 '+rankOf(p[k], all.map(x=>x.pct[k]))+'위 / '+all.length;
@@ -866,6 +868,7 @@ function renderNeeds(){
   const posNote = (S.pos!=='ALL' && N.posHint[S.role]===S.pos) ? ' 약점이 '+POSNAME[S.pos]+' 라인에 있어 포지션을 '+ro(POSNAME[S.pos])+' 맞췄습니다.' : '';
   $('#needNote').innerHTML = w.length
     ? '<b>근거</b> '+w.map(x=>esc(x.txt)).join(' · ')+'.'+posNote+' 두 리그의 '+esc(grp)+' 중 이 역할 점수가 높은 순입니다.'
+      + (w.some(x=>x.pos) ? ' '+POS_TACTIC_NOTE : '')
     : '이 역할은 현재 스쿼드의 뚜렷한 약점으로 잡히지 않았습니다. 참고용 명단입니다 (대상: '+esc(grp)+').';
 }
 
