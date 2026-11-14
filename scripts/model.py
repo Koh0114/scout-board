@@ -514,76 +514,99 @@ def build_pool(raw, yr, K=None, poss_adj=False):
 
 
 # ------------------------------------------------------------------ 팀 스타일 (ROADMAP E)
-# 리그 안 z-점수로 바꾼 뒤 두 리그 40팀을 함께 k-means. 외부 라이브러리 없이, 시드를 고정해 재현 가능하게.
-STYLE_METRICS = [("poss", "점유율"), ("pass_pg", "성공 패스/경기"), ("long_pg", "성공 롱볼/경기"),
-                 ("cross_pg", "성공 크로스/경기"), ("box90", "상대 박스 터치/경기"),
-                 ("press90", "파이널 서드 탈취/경기"), ("defact90", "태클+인터셉트/경기"),
-                 ("xG90", "xG/경기"), ("xGA90", "피xG/경기")]
+# 군집(k-means, 실루엣 0.17)과 단순 비율(리그 순위와 |rho| 0.5~0.64)은 둘 다 팀 수준을 재고 있었다(2026-11-14).
+# 그래서 각 스타일 값을 리그별로 경기당 xG 차이에 회귀한 잔차 = "수준 대비" 값으로 쓴다.
+STYLE = [("poss_res",  "poss",        "수준 대비 점유"),          # 점유율 %
+         ("long_res",  "long_share",  "수준 대비 롱볼 비중"),      # 성공 롱볼 / 성공 패스
+         ("cross_res", "cross_share", "수준 대비 크로스 비중"),    # 성공 크로스 / 상대 박스 터치
+         ("press_res", "press_share", "수준 대비 압박 높이")]      # 파이널 서드 탈취 / (태클+인터셉트)
 
 
-def style_z(teams):
-    """teams: {league: [team dict]} → [(team, z벡터)] — 리그 안 z (모집단 표준편차)."""
-    out = []
+def team_styles(teams):
+    """teams: {league: [team dict]} — 비율과 리그별 xGD90 회귀 잔차를 각 팀 dict에 넣는다."""
     for lg, tt in teams.items():
-        stats = {}
-        for m, _ in STYLE_METRICS:
-            v = [t[m] for t in tt]
-            mu = sum(v) / len(v)
-            stats[m] = (mu, (sum((x - mu) ** 2 for x in v) / len(v)) ** 0.5 or 1.0)
         for t in tt:
-            out.append((t, [(t[m] - stats[m][0]) / stats[m][1] for m, _ in STYLE_METRICS]))
+            t["long_share"] = t["long_pg"] / t["pass_pg"]
+            t["cross_share"] = t["cross_pg"] / t["box90"]
+            t["press_share"] = t["press90"] / t["defact90"]
+        xs = [t["xGD90"] for t in tt]
+        mx = sum(xs) / len(xs)
+        sxx = sum((x - mx) ** 2 for x in xs) or 1.0
+        for key, raw, _ in STYLE:
+            ys = [t[raw] for t in tt]
+            my = sum(ys) / len(ys)
+            b = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / sxx
+            for t in tt:
+                t[key] = t[raw] - (my + b * (t["xGD90"] - mx))
+    return teams
+
+
+def _inv(A):
+    """가우스-조르단 역행렬 (작은 정방행렬)."""
+    n = len(A)
+    M = [list(r) + [float(i == j) for j in range(n)] for i, r in enumerate(A)]
+    for c in range(n):
+        piv = max(range(c, n), key=lambda r: abs(M[r][c]))
+        M[c], M[piv] = M[piv], M[c]
+        d = M[c][c]
+        M[c] = [v / d for v in M[c]]
+        for r in range(n):
+            if r != c:
+                f_ = M[r][c]
+                M[r] = [a - f_ * b for a, b in zip(M[r], M[c])]
+    return [r[n:] for r in M]
+
+
+def style_metric(team_list):
+    """마할라노비스 거리 함수. 공분산은 주어진 팀들에서 추정(모집단 공분산)."""
+    V = [[t[k] for k, _, _ in STYLE] for t in team_list]
+    n, d = len(V), len(STYLE)
+    mu = [sum(v[j] for v in V) / n for j in range(d)]
+    C = [[sum((v[i] - mu[i]) * (v[j] - mu[j]) for v in V) / n for j in range(d)] for i in range(d)]
+    Ci = _inv(C)
+
+    def dist(a, b):
+        x = [a[k] - b[k] for k, _, _ in STYLE]
+        return max(sum(x[i] * Ci[i][j] * x[j] for i in range(d) for j in range(d)), 0.0) ** 0.5
+    return dist
+
+
+def style_euclid(team_list):
+    """비교용: 4개 잔차를 z-점수로 바꾼 유클리드 거리."""
+    sd = {}
+    for k, _, _ in STYLE:
+        v = [t[k] for t in team_list]
+        mu = sum(v) / len(v)
+        sd[k] = (sum((x - mu) ** 2 for x in v) / len(v)) ** 0.5 or 1.0
+    return lambda a, b: sum(((a[k] - b[k]) / sd[k]) ** 2 for k, _, _ in STYLE) ** 0.5
+
+
+def style_neighbors(team_list, dist, n=3):
+    """{(league, id): [(팀, 거리), ...]} 두 리그 전체에서 가까운 n팀."""
+    out = {}
+    for a in team_list:
+        c = sorted(((b, dist(a, b)) for b in team_list if b is not a), key=lambda x: x[1])
+        out[(a["league"], a["id"])] = c[:n]
     return out
 
 
-def _d2(a, b):
-    return sum((x - y) ** 2 for x, y in zip(a, b))
+# ------------------------------------------------------------------ 현 라인과의 유형 비교
+def z_stats(pool, suffix="_adj"):
+    """그룹(peer)별 지표 평균·표준편차 — similar_players와 같은 z 기준. {peer: {m: (mu, sd)}}"""
+    out = {}
+    for lab in peer_labels(pool):
+        grp = [p for p in pool if p["peer"] == lab]
+        out[lab] = {}
+        for m in PLAYER_METRICS:
+            v = [p[m + suffix] for p in grp]
+            mu = sum(v) / len(v)
+            out[lab][m] = (mu, (sum((x - mu) ** 2 for x in v) / len(v)) ** 0.5 or 1.0)
+    return out
 
 
-def kmeans(X, k, restarts=200, iters=100, seed=20261114):
-    """k-means++ 초기화 · restarts번 중 관성(inertia) 최소 해. 반환: (labels, centers, inertia)"""
-    import random
-    rnd = random.Random(seed)
-    best = None
-    for _ in range(restarts):
-        C = [X[rnd.randrange(len(X))]]
-        while len(C) < k:
-            d = [min(_d2(x, c) for c in C) for x in X]
-            r, acc = rnd.random() * sum(d), 0.0
-            for x, w in zip(X, d):
-                acc += w
-                if acc >= r:
-                    C.append(x)
-                    break
-        lab = None
-        for _ in range(iters):
-            new = [min(range(k), key=lambda j: _d2(x, C[j])) for x in X]
-            if new == lab:
-                break
-            lab = new
-            for j in range(k):
-                mem = [x for x, l in zip(X, lab) if l == j]
-                if mem:
-                    C[j] = [sum(c) / len(mem) for c in zip(*mem)]
-        inertia = sum(_d2(x, C[l]) for x, l in zip(X, lab))
-        if best is None or inertia < best[2] - 1e-9:
-            best = (lab, [list(c) for c in C], inertia)
-    return best
-
-
-def silhouette(X, labels):
-    """평균 실루엣 점수 (유클리드 거리)."""
-    k = max(labels) + 1
-    s = []
-    for i, x in enumerate(X):
-        d = {}
-        for j, y in enumerate(X):
-            if i != j:
-                d.setdefault(labels[j], []).append(_d2(x, y) ** 0.5)
-        own = d.get(labels[i], [])
-        if not own:
-            s.append(0.0)
-            continue
-        a = sum(own) / len(own)
-        b = min(sum(v) / len(v) for c, v in d.items() if c != labels[i])
-        s.append((b - a) / max(a, b))
-    return sum(s) / len(s), s
+def wcos(a, b, w):
+    """가중 코사인: Σ w·a·b / (√Σ w·a² · √Σ w·b²)"""
+    num = sum(wi * x * y for wi, x, y in zip(w, a, b))
+    na = sum(wi * x * x for wi, x in zip(w, a)) ** 0.5
+    nb = sum(wi * y * y for wi, y in zip(w, b)) ** 0.5
+    return num / (na * nb) if na and nb else None

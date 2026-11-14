@@ -237,6 +237,21 @@ details.excl p{font-size:13px;color:var(--ink-3);margin:4px 0 12px}
 .blk .bars1{--pb-l:236px}
 .blk .bars1 .pbar{min-height:30px}
 .grp-h{font-size:12px;font-weight:600;color:var(--ink-3);margin:10px 0 2px}
+/* 스타일 지도 */
+.stylew{display:grid;grid-template-columns:minmax(0,360px) minmax(0,1fr);gap:32px;align-items:start}
+#styleMap svg{display:block;max-width:360px}
+.near{list-style:none;margin:4px 0 0;padding:0}
+.near li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}
+.near .tn{font-weight:600}
+.near .st{font-size:12px;color:var(--ink-3);margin-left:6px}
+.near .dv{font-family:var(--f-num);font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink-2)}
+#styleMap circle{cursor:pointer}
+/* 현 라인과 유형 비교 */
+.typew{margin-top:16px}
+.typew h4{font-size:12px;font-weight:600;color:var(--ink-3);margin:0 0 4px}
+.typew h4 span{font-weight:400}
+.typew p{margin:0;font-size:13px;color:var(--ink-2)}
+.typew p b{color:var(--ink);font-weight:600}
 .scale{display:grid;grid-template-columns:var(--pb-l,236px) minmax(0,1fr) 40px;gap:10px;font-size:12px;color:var(--ink-3);margin-top:6px}
 .scale > span:nth-child(2){display:flex;justify-content:space-between}
 .dmeta{display:flex;flex-wrap:wrap;gap:6px 20px;font-size:13px;color:var(--ink-3);margin:16px 0 0}
@@ -274,6 +289,7 @@ footer p{margin:0 0 8px;max-width:80ch}
   .cand,.diag{grid-template-columns:minmax(0,1fr)}
 }
 @media (max-width:640px){
+  .stylew{grid-template-columns:minmax(0,1fr)}
   .wrap{padding-inline:16px}
   .topbar-in{gap:8px 10px}
   .brand{flex:1 1 auto}
@@ -363,6 +379,19 @@ footer p{margin:0 0 8px;max-width:80ch}
         <span class="sub">라인 선수 전원의 90분당 값을 출전 시간으로 가중 평균 · 표본 크기 보정(축소)값 · 리그 안 백분위</span>
         <div class="bars1" id="posBars"></div>
         <div class="scale" aria-hidden="true"><span></span><span><span>← 리그 하위</span><span>리그 상위 →</span></span><span></span></div>
+      </div>
+    </div>
+
+    <div class="blk" style="margin-top:24px">
+      <h3>스타일 지도</h3>
+      <span class="sub">팀 수준(경기당 xG 차이)으로 설명되는 몫을 뺀 값 · 0 = 같은 수준 팀의 리그 평균 · 점을 누르면 롱볼·크로스 비중</span>
+      <div class="stylew">
+        <div id="styleMap"></div>
+        <div>
+          <h3 style="font-size:13px">스타일이 가장 비슷한 팀</h3>
+          <span class="sub" id="nearSub">–</span>
+          <ul class="near" id="nearList"></ul>
+        </div>
       </div>
     </div>
   </section>
@@ -480,6 +509,14 @@ footer p{margin:0 0 8px;max-width:80ch}
       라인 평균은 팀 진단의 포지션별 생산량과 같은 정의 — 그 라인 선수 전원의 축소값을 출전 시간으로 가중 평균 — 입니다.
       결정력(npxG)·찬스 메이킹(xA)은 차이 × <span class="num">2500</span>분 / 90으로 한 시즌 골 단위, 빌드업·볼 탈취·박스 수비는 90분당 차이로만 보여 줍니다.
       팀이 바뀌면 생산량도 바뀌므로 상한 추정치이고, 역할끼리 더한 총합은 만들지 않습니다.</p>
+      <p><b>팀 스타일.</b> 처음에는 팀 지표 9개를 k-means로 묶어 보았지만 실루엣 점수가 0.17로 사실상 군집이 없었고,
+      롱볼 비중(성공 롱볼/성공 패스)·크로스 비중(성공 크로스/상대 박스 터치)·전방 탈취 비중(파이널 서드 탈취/(태클+인터셉트)) 같은
+      비율도 리그 순위와의 상관이 0.5~0.64로 강했습니다. 둘 다 스타일이 아니라 팀 수준을 재고 있었기 때문에,
+      점유율과 세 비율을 리그별로 경기당 xG 차이에 회귀한 잔차, 즉 "수준 대비" 값으로 바꿨습니다(네 값 모두 순위와 |rho| ≤ 0.21).
+      비슷한 팀은 이 네 값의 마할라노비스 거리(공분산은 두 리그 40팀에서 추정)로 고릅니다.
+      이적 선수 122명에서 출발 팀과 도착 팀의 스타일 거리는 역할 점수 변화량과 관계가 없어(스피어만 rho −0.01, p 0.94) 적응 리스크는 표시하지 않습니다.</p>
+      <p><b>현 라인과 유형 비교.</b> 펼친 카드의 유형 유사도는 후보의 13개 지표 프로필을 목표 팀 같은 포지션 라인의 평균 프로필(출전 시간 가중, 축소값)과
+      비교한 가중 코사인입니다(비슷한 선수와 같은 그룹 z · 같은 시즌간 r 가중치). 좋고 나쁨이 아니라 지금 라인과 유형이 얼마나 같은지를 보여 주며, 순위와 역할 점수에는 섞지 않습니다.</p>
       <p><b>점유율 보정.</b> 팀 진단의 수비 활동량(태클+인터셉트)은 상대 점유율 50%로 환산해 비교합니다
       (<span class="num">× 50 / (100 − 팀 점유율)</span>). 선수 지표에는 같은 보정을 넣지 않았습니다 — 백테스트에서 다음 시즌 예측이 오히려 나빠졌습니다.</p>
       <p><b>한계.</b> npxG는 FotMob에 없어 <span class="num">xG − 0.79 × PK 골</span>로 근사했습니다(실축한 PK는 빼지 못합니다).
@@ -843,6 +880,48 @@ function renderDiagnosis(){
   }).join('');
 }
 
+/* 스타일 지도: 가로 수준 대비 점유(%p), 세로 수준 대비 압박 높이(전방 탈취 비중, %p) — 리그 20팀, 선택 팀 강조 */
+const pctp = v => sgn(v, f1) + '%p';
+function renderStyle(){
+  const t = team(), tt = D.teams[S.lg];
+  if(t.poss_res == null){ $('#styleMap').innerHTML = ''; $('#nearList').innerHTML = ''; return; }
+  const W=360, H=280, ml=44, mr=12, mt=12, mb=40;
+  const xs = tt.map(x=>x.poss_res), ys = tt.map(x=>x.press_res*100);
+  const ex = Math.max(...xs.map(Math.abs))*1.15 || 1, ey = Math.max(...ys.map(Math.abs))*1.15 || 1;
+  const X = v=>ml + (v+ex)/(2*ex)*(W-ml-mr), Y = v=>mt + (ey-v)/(2*ey)*(H-mt-mb);
+  const T = (x,y,s,a,extra)=>'<text x="'+x+'" y="'+y+'" font-size="12" fill="var(--ink-3)" text-anchor="'+(a||'middle')+'"'+(extra||'')+'>'+s+'</text>';
+  let g = '';
+  g += '<line x1="'+X(0)+'" y1="'+mt+'" x2="'+X(0)+'" y2="'+(H-mb)+'" stroke="var(--line)"/>';
+  g += '<line x1="'+ml+'" y1="'+Y(0)+'" x2="'+(W-mr)+'" y2="'+Y(0)+'" stroke="var(--line)"/>';
+  g += T(ml, H-mb+16, '← 덜 점유', 'start') + T(W-mr, H-mb+16, '더 점유 →', 'end');
+  g += T((ml+W-mr)/2, H-6, '수준 대비 점유 (%p)');
+  g += T(ml-6, mt+10, '높게', 'end') + T(ml-6, H-mb, '낮게', 'end');
+  g += T(12, (mt+H-mb)/2, '수준 대비 압박 높이 (%p)', 'middle', ' transform="rotate(-90 12 '+((mt+H-mb)/2)+')"');
+  const dot = (x, me)=>'<circle cx="'+X(x.poss_res).toFixed(1)+'" cy="'+Y(x.press_res*100).toFixed(1)+'" r="'+(me?6:4)+'" fill="'+(me?'var(--accent)':'var(--mid)')+'" data-id="'+x.id+'"/>';
+  tt.filter(x=>x!==t).forEach(x=>{ g += dot(x, false); });
+  g += dot(t, true);
+  const lx = X(t.poss_res), ly = Y(t.press_res*100);
+  g += '<text x="'+(lx + (lx > W*0.7 ? -10 : 10))+'" y="'+(ly+4)+'" font-size="12" font-weight="600" fill="var(--ink)" text-anchor="'+(lx > W*0.7 ? 'end' : 'start')+'">'+esc(t.name)+'</text>';
+  const box = $('#styleMap');
+  box.innerHTML = '<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="'+esc(LGNAME[S.lg])+' 스타일 지도: 수준 대비 점유와 압박 높이">'+g+'</svg>';
+  const tipOf = x => '<b>'+esc(x.name)+'</b> · 리그 '+(x.rank||'–')+'위<br>'
+    + '수준 대비 점유 <span class="num">'+pctp(x.poss_res)+'</span> (점유율 <span class="num">'+f1(x.poss)+'%</span>)<br>'
+    + '수준 대비 압박 높이 <span class="num">'+pctp(x.press_res*100)+'</span><br>'
+    + '롱볼 비중 <span class="num">'+f1(x.long_share*100)+'%</span> (수준 대비 <span class="num">'+pctp(x.long_res*100)+'</span>)<br>'
+    + '크로스 비중 <span class="num">'+f1(x.cross_share*100)+'%</span> (수준 대비 <span class="num">'+pctp(x.cross_res*100)+'</span>)';
+  box.querySelectorAll('circle').forEach(c=>{
+    const x = tt.find(y=>String(y.id)===c.dataset.id);
+    c.addEventListener('mousemove', e=>showTip(tipOf(x), e.clientX, e.clientY));
+    c.addEventListener('click', e=>showTip(tipOf(x), e.clientX, e.clientY));
+    c.addEventListener('mouseleave', hideTip);
+  });
+  $('#nearSub').textContent = '두 리그 40팀 중 · 수준 대비 점유·롱볼 비중·크로스 비중·압박 높이 4개의 마할라노비스 거리 (작을수록 비슷)';
+  $('#nearList').innerHTML = (t.style_near || []).map(([l, id, dd])=>{
+    const x = D.teams[l].find(y=>y.id===id); if(!x) return '';
+    return '<li><span><span class="tn">'+esc(x.name)+'</span><span class="st">'+LGSHORT[l]+' '+(x.rank||'–')+'위</span></span><span class="dv">'+f2(dd)+'</span></li>';
+  }).join('');
+}
+
 /* ===================== 영입 후보 ===================== */
 function renderNeeds(){
   const N = NEED;
@@ -878,12 +957,30 @@ function detailHtml(p){
     + '<p class="vnote">'+esc(valueCaveat(S.role))+'</p>'
     + '<div class="pgroups">' + PGROUPS.map(([g, ms])=>'<div class="pgroup"><h4>'+g+'</h4>'
         + ms.map(([k,lab])=>pbar(lab, p.pc[k], {title:MLAB[k]+' '+f2(p[k])})).join('') + '</div>').join('') + '</div>'
+    + typeHtml(p)
     + simHtml(p)
     + '<p class="det-note">막대는 '+esc(peerName(p.pg))+' 그룹 안 백분위입니다'+(p.pg.indexOf('+')>=0?' (인원이 적어 그룹을 합침)':'')
     + '. 역할 점수는 후보 풀 전체 기준입니다.</p>';
 }
 
 /* 비슷한 선수 8명 (build.py가 미리 계산: [id, 리그, 코사인 유사도]) */
+/* 현 라인과 유형 비교: 후보와 라인 평균 프로필을 같은 그룹 z로 바꿔 시즌간 r 가중 코사인 (build.py zstats·prof·sim_w) */
+const MNAME = Object.fromEntries(PGROUPS.flatMap(([,ms])=>ms));
+function typeHtml(p){
+  const t = team(), bp = t.by_pos[p.p], zs = D.meta.zstats[p.pg], w = D.meta.sim_w[p.pg];
+  if(!bp || !bp.n || !bp.prof || !zs || !w) return '';
+  const ms = Object.keys(zs).filter(m=>bp.prof[m]!=null);
+  const z = (v,m)=>(v - zs[m][0]) / zs[m][1];
+  const a = ms.map(m=>z(p[m+'_adj'], m)), b = ms.map(m=>z(bp.prof[m], m)), wv = ms.map(m=>w[m]);
+  const dot = a.reduce((s,x,i)=>s + wv[i]*x*b[i], 0);
+  const na = Math.sqrt(a.reduce((s,x,i)=>s + wv[i]*x*x, 0)), nb = Math.sqrt(b.reduce((s,x,i)=>s + wv[i]*x*x, 0));
+  if(!na || !nb) return '';
+  const diff = ms.map((m,i)=>[m, Math.sqrt(wv[i])*(a[i]-b[i])]).sort((x,y)=>Math.abs(y[1])-Math.abs(x[1])).slice(0,3);
+  return '<div class="typew"><h4>현 라인과 유형 비교 <span>· '+esc(t.name)+' '+POSNAME[p.p]+' 라인 평균 프로필과의 가중 코사인 — 좋고 나쁨이 아니라 유형이 얼마나 같은지</span></h4>'
+    + '<p>현 라인과 유형 유사도 <b class="num">'+sgn(dot/(na*nb), f2)+'</b> · 가장 크게 다른 지표: '
+    + diff.map(([m,v])=>esc(MNAME[m])+' '+(v>0?'더 많음':'더 적음')).join(', ')+'</p></div>';
+}
+
 const SIM_RARE = 0.6;   // 1위 유사도가 이보다 낮으면 '비슷한 유형이 드문 선수'
 function simHtml(p){
   if(!p.sim || !p.sim.length) return '';
@@ -1118,6 +1215,7 @@ function render(){
   NEED = computeNeeds(t);
   if(!S.role){ S.role = NEED.order[0]; setPos(NEED.posHint[S.role] || 'ALL'); }
   renderDiagnosis();
+  renderStyle();
   renderRecruit();
 }
 
