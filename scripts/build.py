@@ -74,6 +74,8 @@ def team_block(lg, yr):
     box, press = by_team("touches_in_opp_box_team"), by_team("poss_won_att_3rd_team")
     poss = by_team("possession_percentage_team")
     tkl, intc = by_team("total_tackle_team"), by_team("interception_team")
+    pas, lng, crs = (by_team("accurate_pass_team"), by_team("accurate_long_balls_team"),
+                     by_team("accurate_cross_team"))
 
     # 최근 6경기 — 끝난 경기만, 시간순
     results = {}
@@ -112,6 +114,8 @@ def team_block(lg, yr):
             press90=press[tid]["StatValue"],
             poss=p,
             defact90=defact,
+            # 스타일 분류용: 경기당 성공 패스·롱볼·크로스 (StatValue가 이미 경기당)
+            pass_pg=pas[tid]["StatValue"], long_pg=lng[tid]["StatValue"], cross_pg=crs[tid]["StatValue"],
             # 점유율 보정: 상대가 공을 50% 가진 것으로 환산 (FOTMOB_MIGRATION.md 3절)
             defact_adj=defact * 50 / (100 - p),
             form=results.get(tid, [])[-6:],

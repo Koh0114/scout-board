@@ -42,6 +42,8 @@ TEAM_STATS = [
     "expected_goals_team", "expected_goals_conceded_team", "touches_in_opp_box_team",
     "poss_won_att_3rd_team", "possession_percentage_team",
     "total_tackle_team", "interception_team",
+    # 스타일 분류(ROADMAP E): 경기당 성공 패스·롱볼·크로스 (StatValue = 경기당, SubStatValue = 성공률 %)
+    "accurate_pass_team", "accurate_long_balls_team", "accurate_cross_team",
 ]
 
 PLAYER_KEYS = ("ParticiantId", "ParticipantName", "TeamId", "TeamName", "Positions",

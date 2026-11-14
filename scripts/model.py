@@ -511,3 +511,79 @@ def build_pool(raw, yr, K=None, poss_adj=False):
         return score_pool(pool, suffix="")
     apply_shrinkage(pool, K, prior_means(pool))
     return score_pool(pool, suffix="_adj")
+
+
+# ------------------------------------------------------------------ 팀 스타일 (ROADMAP E)
+# 리그 안 z-점수로 바꾼 뒤 두 리그 40팀을 함께 k-means. 외부 라이브러리 없이, 시드를 고정해 재현 가능하게.
+STYLE_METRICS = [("poss", "점유율"), ("pass_pg", "성공 패스/경기"), ("long_pg", "성공 롱볼/경기"),
+                 ("cross_pg", "성공 크로스/경기"), ("box90", "상대 박스 터치/경기"),
+                 ("press90", "파이널 서드 탈취/경기"), ("defact90", "태클+인터셉트/경기"),
+                 ("xG90", "xG/경기"), ("xGA90", "피xG/경기")]
+
+
+def style_z(teams):
+    """teams: {league: [team dict]} → [(team, z벡터)] — 리그 안 z (모집단 표준편차)."""
+    out = []
+    for lg, tt in teams.items():
+        stats = {}
+        for m, _ in STYLE_METRICS:
+            v = [t[m] for t in tt]
+            mu = sum(v) / len(v)
+            stats[m] = (mu, (sum((x - mu) ** 2 for x in v) / len(v)) ** 0.5 or 1.0)
+        for t in tt:
+            out.append((t, [(t[m] - stats[m][0]) / stats[m][1] for m, _ in STYLE_METRICS]))
+    return out
+
+
+def _d2(a, b):
+    return sum((x - y) ** 2 for x, y in zip(a, b))
+
+
+def kmeans(X, k, restarts=200, iters=100, seed=20261114):
+    """k-means++ 초기화 · restarts번 중 관성(inertia) 최소 해. 반환: (labels, centers, inertia)"""
+    import random
+    rnd = random.Random(seed)
+    best = None
+    for _ in range(restarts):
+        C = [X[rnd.randrange(len(X))]]
+        while len(C) < k:
+            d = [min(_d2(x, c) for c in C) for x in X]
+            r, acc = rnd.random() * sum(d), 0.0
+            for x, w in zip(X, d):
+                acc += w
+                if acc >= r:
+                    C.append(x)
+                    break
+        lab = None
+        for _ in range(iters):
+            new = [min(range(k), key=lambda j: _d2(x, C[j])) for x in X]
+            if new == lab:
+                break
+            lab = new
+            for j in range(k):
+                mem = [x for x, l in zip(X, lab) if l == j]
+                if mem:
+                    C[j] = [sum(c) / len(mem) for c in zip(*mem)]
+        inertia = sum(_d2(x, C[l]) for x, l in zip(X, lab))
+        if best is None or inertia < best[2] - 1e-9:
+            best = (lab, [list(c) for c in C], inertia)
+    return best
+
+
+def silhouette(X, labels):
+    """평균 실루엣 점수 (유클리드 거리)."""
+    k = max(labels) + 1
+    s = []
+    for i, x in enumerate(X):
+        d = {}
+        for j, y in enumerate(X):
+            if i != j:
+                d.setdefault(labels[j], []).append(_d2(x, y) ** 0.5)
+        own = d.get(labels[i], [])
+        if not own:
+            s.append(0.0)
+            continue
+        a = sum(own) / len(own)
+        b = min(sum(v) / len(v) for c, v in d.items() if c != labels[i])
+        s.append((b - a) / max(a, b))
+    return sum(s) / len(s), s
