@@ -11,10 +11,12 @@ from datetime import timezone, datetime, timedelta
 from model import (LEAGUES, POOL_MIN, PLAYER_METRICS, DISPLAY_METRICS, ROLES, POS_GROUPS,
                    PK_XG, MIN_GROUP, season_label, pct_rank, played, season_block,
                    player_rows, pool_rows, excluded_rows, merge_groups, peer_labels,
-                   estimate_k, prior_means, apply_shrinkage, score_pool)
+                   estimate_k, prior_means, apply_shrinkage, score_pool,
+                   similar_players, sim_weights, SIM_N)
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 RAW = os.path.join(ROOT, "data", "fotmob_raw.json")
+STATUS = os.path.join(ROOT, "data", "fotmob_status.json")   # fetch_fotmob.py가 쓴다 (시즌 초에 뺀 시즌)
 DOCS = os.path.join(ROOT, "docs")
 TEMPLATE = os.path.join(ROOT, "site", "template.html")
 
@@ -37,6 +39,15 @@ CUR = years[-1]
 SEASON = CUR if played(d, CUR) >= SWITCH_AFTER else CUR - 1
 FORM = CUR
 print(f"기준 시즌 {season_label(SEASON)} ({played(d, SEASON)}경기) · 최근 폼 {season_label(FORM)} ({played(d, FORM)}경기)")
+SKIPPED = (json.load(open(STATUS, encoding="utf-8")).get("skipped") or []) if os.path.exists(STATUS) else []
+SEASON_NOTE = None
+if SKIPPED:
+    new = sorted({x["season"] for x in SKIPPED})
+    SEASON_NOTE = (f"새 시즌({', '.join(n.replace('/20', '/') for n in new)}) 지표 파일이 FotMob에 아직 없어 "
+                   f"{season_label(SEASON)} 기준으로 만들었고, 최근 폼은 빠져 있습니다.")
+    print(f"⚠ 시즌 초: {SEASON_NOTE}")
+if FORM == SEASON:
+    print("최근 폼 없음 — 기준 시즌과 같은 시즌이라 form_now·now를 비워 둔다")
 if f"{list(LEAGUES)[0]}_{SEASON}" not in d:
     sys.exit(f"기준 시즌 {SEASON} 데이터가 원본에 없습니다.")
 
@@ -144,6 +155,15 @@ PRIOR = prior_means(pool)
 apply_shrinkage(pool, K_VALUES, PRIOR)
 score_pool(pool, suffix="_adj")
 
+# 유사 선수: 같은 그룹 안 축소값 z-벡터의 가중 코사인 유사도 (같은 팀 제외). 사이트는 계산하지 않고 읽기만 한다.
+# 가중치 = 그 그룹 안 시즌간 상관계수 r (K 추정과 같은 표본, 음수면 0).
+SIM_W, SIM_WN = sim_weights(d, years, peer_labels(pool), log=print)
+print("유사도 가중치 (그룹 안 시즌간 r, 음수 → 0):")
+print("  " + " " * 8 + "".join(f"{m[:-2][:6]:>7}" for m in PLAYER_METRICS))
+for lab in peer_labels(pool):
+    print(f"  {lab:<5}{SIM_WN[lab]:>3}" + "".join(f"{SIM_W[lab][m]:>7.2f}" for m in PLAYER_METRICS))
+SIM = similar_players(pool, SIM_W)
+
 for lg, tt in teams.items():
     for name, t in tt.items():
         squad = [p for p in players if p["team_id"] == t["id"] and p["league"] == lg]
@@ -187,6 +207,8 @@ def slim(p):
     o["pa"] = {k: p["pctA"][k] for k in PLAYER_METRICS}
     o["r"] = p["role"]                                            # z 합성값의 풀 안 백분위 순위
     o["rz"] = {k: round(v, 3) for k, v in p["role_z"].items()}    # z 합성값 원본
+    # 비슷한 선수 SIM_N명: [id, 리그, 유사도]
+    o["sim"] = [[q["id"], q["league"], round(s, 3)] for q, s in SIM[(p["league"], p["id"])]]
     fp = form_players.get((p["league"], p["id"]))
     if fp and fp["mins"] >= 90 and FORM != SEASON:
         o["now"] = dict(m=fp["mins"], g=fp["g"], a=fp["a"],
@@ -199,6 +221,9 @@ out = dict(
     meta=dict(source="FotMob", season=season_label(SEASON),
               form_season=season_label(FORM), leagues=LEAGUES, pool_min=POOL_MIN,
               generated=datetime.now(KST).strftime("%Y-%m-%d %H:%M KST"),
+              season_note=SEASON_NOTE,
+              sim_w={lab: {m: round(SIM_W[lab][m], 2) for m in PLAYER_METRICS} for lab in SIM_W},
+              sim_w_n=SIM_WN,
               pos_groups=list(POS_GROUPS),
               # pc(그룹 백분위)와 축소 사전평균은 peer_groups 기준. 합쳤으면 groups_merged에 기록
               peer_groups=counts, min_group=MIN_GROUP, groups_merged=MERGES,

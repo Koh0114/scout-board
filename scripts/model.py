@@ -335,12 +335,9 @@ def peer_labels(pool):
 
 
 # ------------------------------------------------------------------ 모델
-def estimate_k(raw, years, log=None, pairs=None):
-    """연속 두 시즌 모두 K_MIN_MINS 이상 뛴 선수로 시즌간 상관계수를 구해
-    K ≈ 평균출전분 × (1−r)/r 로 추정한다. 표본이 모자라면 기본값.
-    두 시즌 모두 완주한 쌍만 쓴다 — 진행 중인 시즌은 출전 분이 짧아 r을 깎는다.
-    표본은 두 시즌 모두 후보 풀 조건(in_pool)을 만족한 선수로, 모든 지표가 같은 표본이다.
-    pairs를 주면 그 쌍만 쓴다 (백테스트에서 시험 쌍을 빼고 추정할 때)."""
+def pair_rows(raw, years, pairs=None):
+    """시즌간 상관계수 표본: 완주한 연속 시즌쌍에서 두 시즌 모두 후보 풀(in_pool)에 든 선수의
+    (앞 시즌 행, 뒤 시즌 행) 목록. K 추정과 유사도 가중치가 같은 표본을 쓴다."""
     years = [y for y in years if completed(raw, y)]
     if pairs is None:
         pairs = [(y, y + 1) for y in years if y + 1 in years]
@@ -355,6 +352,16 @@ def estimate_k(raw, years, log=None, pairs=None):
             b = by_id.get(a["id"])
             if b:
                 rows.append((a, b))
+    return pairs, rows
+
+
+def estimate_k(raw, years, log=None, pairs=None):
+    """연속 두 시즌 모두 K_MIN_MINS 이상 뛴 선수로 시즌간 상관계수를 구해
+    K ≈ 평균출전분 × (1−r)/r 로 추정한다. 표본이 모자라면 기본값.
+    두 시즌 모두 완주한 쌍만 쓴다 — 진행 중인 시즌은 출전 분이 짧아 r을 깎는다.
+    표본은 두 시즌 모두 후보 풀 조건(in_pool)을 만족한 선수로, 모든 지표가 같은 표본이다.
+    pairs를 주면 그 쌍만 쓴다 (백테스트에서 시험 쌍을 빼고 추정할 때)."""
+    pairs, rows = pair_rows(raw, years, pairs)
     if log:
         log(f"K 추정 — 완주 시즌쌍 {[f'{season_label(a)}→{season_label(b)}' for a, b in pairs]}, "
             f"양 시즌 후보 풀 선수 {len(rows)}건")
@@ -428,6 +435,65 @@ def score_pool(pool, suffix="_adj"):
         for p in pool:
             p.setdefault("role", {})[k] = round(pct_rank(vals, p["role_z"][k]), 1)
     return pool
+
+
+SIM_N = 8                 # 선수당 "비슷한 선수" 수
+
+
+def sim_weights(raw, years, labels, log=None):
+    """유사도 지표 가중치 = 그 포지션 그룹 안에서의 시즌간 상관계수 r (음수면 0).
+    표본은 K 추정과 같다(pair_rows). 그룹은 앞 시즌 포지션 기준이고, 합친 그룹(예: AM+ST)은
+    구성 그룹 선수를 모두 쓴다. 그룹 표본이 K_MIN_SAMPLE 미만이면 그 그룹은 전체 표본의 r을 쓴다.
+    반환: {그룹 이름: {지표: 가중치}}, {그룹 이름: 표본 수}"""
+    _, rows = pair_rows(raw, years)
+
+    def rs(pr):
+        return {m: max(pearson([a[m] for a, _ in pr], [b[m] for _, b in pr]) or 0.0, 0.0)
+                for m in PLAYER_METRICS}
+    allr = rs(rows) if len(rows) >= K_MIN_SAMPLE else {m: 1.0 for m in PLAYER_METRICS}
+    W, N = {}, {}
+    for lab in labels:
+        bases = lab.split("+")
+        pr = [(a, b) for a, b in rows if a["pos"] in bases]
+        N[lab] = len(pr)
+        W[lab] = rs(pr) if len(pr) >= K_MIN_SAMPLE else dict(allr)
+        if log and len(pr) < K_MIN_SAMPLE:
+            log(f"  유사도 가중치 {lab}: 표본 {len(pr)}명 < {K_MIN_SAMPLE} → 전체 표본 r 사용")
+    return W, N
+
+
+def similar_players(pool, weights=None, n=SIM_N, suffix="_adj"):
+    """같은 포지션 그룹(peer, 합쳤으면 합친 그룹) 안에서 축소된 13개 지표를 그룹 안 z-점수로
+    바꾸고, 지표별 가중치 w(그룹 안 시즌간 상관계수, sim_weights)로 가중한 코사인 유사도:
+        Σ w·a·b / (√Σ w·a² · √Σ w·b²)
+    시즌마다 크게 바뀌는(=선수보다 운·팀 사정이 크게 작용하는) 지표일수록 덜 반영된다.
+    weights가 없으면 가중치 1. 같은 팀(같은 리그·같은 팀 ID) 선수와 자기 자신은 뺀다.
+    반환: {(league, id): [(상대 선수 행, 유사도), ...]} 유사도 높은 순 n명."""
+    out = {}
+    for lab in peer_labels(pool):
+        grp = [p for p in pool if p["peer"] == lab]
+        w = [weights[lab][m] if weights else 1.0 for m in PLAYER_METRICS]
+        stats = {}
+        for m in PLAYER_METRICS:
+            vals = [p[m + suffix] for p in grp]
+            mu = sum(vals) / len(vals)
+            stats[m] = (mu, (sum((v - mu) ** 2 for v in vals) / len(vals)) ** 0.5 or 1.0)
+        vec = {id(p): [(p[m + suffix] - stats[m][0]) / stats[m][1] for m in PLAYER_METRICS] for p in grp}
+        norm = {k: sum(wi * x * x for wi, x in zip(w, v)) ** 0.5 or 1.0 for k, v in vec.items()}
+        for p in grp:
+            a = vec[id(p)]
+            cands = []
+            for q in grp:
+                if q is p or q["id"] == p["id"]:
+                    continue
+                if q["team_id"] == p["team_id"] and q["league"] == p["league"]:
+                    continue
+                b = vec[id(q)]
+                dot = sum(wi * x * y for wi, x, y in zip(w, a, b))
+                cands.append((q, dot / (norm[id(p)] * norm[id(q)])))
+            cands.sort(key=lambda t: -t[1])
+            out[(p["league"], p["id"])] = cands[:n]
+    return out
 
 
 def build_pool(raw, yr, K=None, poss_adj=False):

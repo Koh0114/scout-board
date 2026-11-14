@@ -17,6 +17,14 @@ LEAGUES = {"EPL": 47, "La_liga": 87}          # model.LEAGUES와 같은 키
 N_SEASONS = 4                                  # 백테스트가 연속 시즌쌍 2개를 쓴다
 PAUSE = 0.6                                    # 요청 사이 최소 대기(초)
 OUT = os.path.join(os.path.dirname(__file__), "..", "data", "fotmob_raw.json")
+# 이번 실행에서 뺀 시즌 등 상태 기록 — build.py가 읽어 사이트 안내 문구에 쓴다.
+STATUS = os.path.join(os.path.dirname(__file__), "..", "data", "fotmob_status.json")
+
+# 시즌 초 대비: 새 시즌이 시작돼도 FotMob 지표 파일은 한동안 없다 (403/404, 또는
+# seasonStatLinks에 아직 안 올라옴). 그때만 현재 시즌을 빼고 직전 시즌까지로 저장한다.
+# '시즌 초'는 달력이 아니라 순위표로 판단한다 — 가장 많이 치른 팀이 이 경기 수 이하.
+# 그 밖의 경우(지난 시즌 파일 없음, 시즌 중반에 현재 시즌 파일 없음, JSON 아님, 키 없음)는 실패한다.
+EARLY_MAX_PLAYED = 6
 
 # 필요한 파일만 받는다. 규약(StatValue/SubStatValue 뜻)은 FOTMOB_MIGRATION.md 1절.
 PLAYER_STATS = [
@@ -145,29 +153,56 @@ def stat_file(lid, sid, name, team):
     return dict(title=tl.get("Title"), subtitle=tl.get("Subtitle"), rows=rows)
 
 
+def warn(msg):
+    print(f"⚠ {msg}")
+    if os.environ.get("GITHUB_ACTIONS"):          # Actions 실행 요약에도 남긴다
+        print(f"::warning title=시즌 초::{msg}")
+
+
 def main():
-    out = {}
+    out, skipped = {}, []
     for lg, lid in LEAGUES.items():
         latest_raw, latest = league_page(lid)
         links = need(latest_raw, ["stats", "seasonStatLinks"], f"leagues?id={lid}")
         sids = {need(l, ["Name"], "seasonStatLinks"): need(l, ["TournamentId"], "seasonStatLinks")
                 for l in links}
-        seasons = sorted(sids, reverse=True)[:N_SEASONS]
-        if latest["season"] not in sids:
-            sys.exit(f"{lg}: 최신 시즌 {latest['season']}의 지표 ID가 seasonStatLinks에 없다")
+        cur = latest["season"]
+        cur_played = max((r["played"] for r in latest["table"]), default=0)
+        early = cur_played <= EARLY_MAX_PLAYED
+        # 최근 N_SEASONS 시즌 창은 현재 시즌을 포함해 고정한다. 현재 시즌을 빼면 창이 그만큼 줄어든다
+        # (더 오래된 시즌을 당겨 오지 않는다 — 백테스트에 필요한 완주 3시즌은 그대로 남는다).
+        seasons = sorted(set(sids) | {cur}, reverse=True)[:N_SEASONS]
+
+        def skip_current(why):
+            if not early:
+                sys.exit(f"{lg} {cur}: {why} — 시즌 초가 아니라서({cur_played}경기 치름 > "
+                         f"{EARLY_MAX_PLAYED}) 구조 변경이나 차단으로 보고 멈춘다")
+            warn(f"{lg} {cur} ({cur_played}경기 치름): {why} — 이 시즌을 빼고 직전 시즌 기준으로 저장한다")
+            skipped.append(dict(league=lg, season=cur, played=cur_played, reason=why))
+
         for season in seasons:
             yr = int(season.split("/")[0])
             key = f"{lg}_{yr}"
-            page = latest if season == latest["season"] else league_page(lid, season)[1]
+            if season == cur and season not in sids:
+                skip_current("seasonStatLinks에 아직 없음")
+                continue
+            page = latest if season == cur else league_page(lid, season)[1]
             sid = sids[season]
             stats = {}
             for name in PLAYER_STATS + TEAM_STATS:
                 try:
                     stats[name] = stat_file(lid, sid, name, name in TEAM_STATS)
                 except Missing as e:
-                    if name not in OPTIONAL_STATS:
+                    if name in OPTIONAL_STATS:
+                        stats[name] = None
+                        continue
+                    if season != cur:
                         sys.exit(f"{key}: 지표 파일 없음 — {e}")
-                    stats[name] = None
+                    skip_current(f"지표 파일 {name} 없음 (HTTP {str(e).split(' → ')[-1][:3]})")
+                    stats = None
+                    break
+            if stats is None:
+                continue
             played = max((r["played"] for r in page["table"]), default=0)
             n_players = len(stats["mins_played"]["rows"])
             absent = [n for n, v in stats.items() if v is None]
@@ -176,12 +211,22 @@ def main():
                   + (f" · 없음: {', '.join(absent)}" if absent else ""))
             out[key] = dict(league_id=lid, season_id=sid, **page, stats=stats)
 
+    # 한 리그라도 현재 시즌을 뺐으면 모든 리그에서 뺀다 — 리그마다 기준 시즌·최근 폼이 갈리지 않게.
+    if skipped:
+        yrs = {int(x["season"].split("/")[0]) for x in skipped}
+        for k in [k for k in out if int(k.rsplit("_", 1)[1]) in yrs]:
+            warn(f"{k}: 다른 리그의 새 시즌 파일이 아직 없어 같이 뺀다")
+            del out[k]
+
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     tmp = OUT + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
     os.replace(tmp, OUT)
-    print(f"\n저장: {os.path.abspath(OUT)} ({os.path.getsize(OUT) / 1e6:.1f} MB)")
+    with open(STATUS, "w", encoding="utf-8") as f:          # 매번 새로 쓴다 (지난 실행 상태가 남지 않게)
+        json.dump(dict(skipped=skipped, seasons=sorted(out)), f, ensure_ascii=False, indent=1)
+    print(f"\n저장: {os.path.abspath(OUT)} ({os.path.getsize(OUT) / 1e6:.1f} MB)"
+          + (f" · 시즌 초라 뺀 시즌: {sorted({x['season'] for x in skipped})}" if skipped else ""))
 
 
 if __name__ == "__main__":
