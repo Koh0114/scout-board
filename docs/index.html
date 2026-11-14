@@ -897,8 +897,8 @@ function renderDiagnosis(){
   }).join('');
 }
 
-/* 스타일 문장: 잔차 4개 중 40팀 안 |z|가 큰 것부터 2개(세 번째는 |z| ≥ 1일 때만).
-   가장 큰 |z|도 STY_FLAT 미만이면 '평균에 가까운 팀' */
+/* 스타일 문장: 잔차 4개 중 40팀 안 |z| ≥ STY_FLAT인 특징만, 큰 순서로 최대 3개.
+   하나도 없으면 '평균에 가까운 팀' */
 const STY = {
   poss_res:  {s:'점유',   v:x=>x.poss_res,      up:['공을 더 갖고','공을 더 갖는'],         dn:['공은 덜 갖고','공은 덜 갖는']},
   long_res:  {s:'롱볼',   v:x=>x.long_res*100,  up:['롱볼을 더 쓰고','롱볼을 더 쓰는'],     dn:['롱볼을 덜 쓰고','롱볼을 덜 쓰는']},
@@ -908,8 +908,7 @@ const STY = {
 const STY_FLAT = 0.5;   // |z|가 이보다 작으면 '평균 근처'
 function styleKeys(t){
   const ks = Object.keys(STY).sort((a,b)=>Math.abs(t.style_z[b])-Math.abs(t.style_z[a]));
-  if(Math.abs(t.style_z[ks[0]]) < STY_FLAT) return [];
-  return ks.filter((k,i)=> i<2 || (i===2 && Math.abs(t.style_z[k]) >= 1));
+  return ks.filter(k=>Math.abs(t.style_z[k]) >= STY_FLAT).slice(0,3);
 }
 function styleSentence(t){
   const ks = styleKeys(t);
