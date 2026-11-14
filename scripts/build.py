@@ -12,7 +12,7 @@ from model import (LEAGUES, POOL_MIN, PLAYER_METRICS, DISPLAY_METRICS, ROLES, PO
                    PK_XG, MIN_GROUP, season_label, pct_rank, played, season_block,
                    player_rows, pool_rows, excluded_rows, merge_groups, peer_labels,
                    estimate_k, prior_means, apply_shrinkage, score_pool,
-                   similar_players, SIM_N)
+                   similar_players, sim_weights, SIM_N)
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 RAW = os.path.join(ROOT, "data", "fotmob_raw.json")
@@ -155,8 +155,14 @@ PRIOR = prior_means(pool)
 apply_shrinkage(pool, K_VALUES, PRIOR)
 score_pool(pool, suffix="_adj")
 
-# 유사 선수: 같은 그룹 안 축소값 z-벡터의 코사인 유사도 (같은 팀 제외). 사이트는 계산하지 않고 읽기만 한다.
-SIM = similar_players(pool)
+# 유사 선수: 같은 그룹 안 축소값 z-벡터의 가중 코사인 유사도 (같은 팀 제외). 사이트는 계산하지 않고 읽기만 한다.
+# 가중치 = 그 그룹 안 시즌간 상관계수 r (K 추정과 같은 표본, 음수면 0).
+SIM_W, SIM_WN = sim_weights(d, years, peer_labels(pool), log=print)
+print("유사도 가중치 (그룹 안 시즌간 r, 음수 → 0):")
+print("  " + " " * 8 + "".join(f"{m[:-2][:6]:>7}" for m in PLAYER_METRICS))
+for lab in peer_labels(pool):
+    print(f"  {lab:<5}{SIM_WN[lab]:>3}" + "".join(f"{SIM_W[lab][m]:>7.2f}" for m in PLAYER_METRICS))
+SIM = similar_players(pool, SIM_W)
 
 for lg, tt in teams.items():
     for name, t in tt.items():
@@ -216,6 +222,8 @@ out = dict(
               form_season=season_label(FORM), leagues=LEAGUES, pool_min=POOL_MIN,
               generated=datetime.now(KST).strftime("%Y-%m-%d %H:%M KST"),
               season_note=SEASON_NOTE,
+              sim_w={lab: {m: round(SIM_W[lab][m], 2) for m in PLAYER_METRICS} for lab in SIM_W},
+              sim_w_n=SIM_WN,
               pos_groups=list(POS_GROUPS),
               # pc(그룹 백분위)와 축소 사전평균은 peer_groups 기준. 합쳤으면 groups_merged에 기록
               peer_groups=counts, min_group=MIN_GROUP, groups_merged=MERGES,
